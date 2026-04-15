@@ -1,0 +1,53 @@
+{
+  "name": "inventory-desktop",
+  "version": "1.0.0",
+  "description": "Production Inventory Management System desktop app",
+  "main": "electron/main.js",
+  "author": "Inventory Team",
+  "license": "MIT",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:electron": "cross-env NODE_ENV=development PYTHON_EXECUTABLE=C:\\Users\\codew\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\\python.exe electron .",
+    "dev": "npm run dev:frontend",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:frontend && electron-builder",
+    "dist": "npm run build"
+  },
+  "dependencies": {
+    "electron-log": "^5.4.0",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^35.1.5",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.company.inventorydesktop",
+    "productName": "Inventory Desktop",
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "backend/**/*",
+      "requirements.txt"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ]
+  }
+}
