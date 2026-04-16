@@ -6,138 +6,223 @@ const { spawn } = require("child_process");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
 
+// Configure electron-log to write to userData/logs/
+log.transports.file.resolvePathFn = () =>
+  path.join(app.getPath("userData"), "logs", "main.log");
+log.transports.file.level = "info";
+log.transports.console.level = "debug";
+
 let mainWindow;
 let backendProcess;
+let backendSpawnError = null; // set if spawn itself fails
 
-/** Poll http://127.0.0.1:8000/api/health until it responds or we time out. */
-function waitForBackend(maxWaitMs = 30000, intervalMs = 500) {
+/* ---------------- BACKEND READY CHECK ---------------- */
+/**
+ * Polls /api/health until the backend responds or we time out.
+ * Rejects immediately if the spawn already errored.
+ */
+function waitForBackend(maxWaitMs = 45000, intervalMs = 600) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + maxWaitMs;
+
     function attempt() {
+      // If spawn already failed, no point polling
+      if (backendSpawnError) {
+        return reject(backendSpawnError);
+      }
+
       const req = http.get("http://127.0.0.1:8000/api/health", (res) => {
         if (res.statusCode < 500) {
-          log.info("[backend] ready ✅");
+          log.info("[backend] health check passed");
           resolve();
         } else {
           retry();
         }
+        // Drain the response so the socket closes
+        res.resume();
       });
+
       req.on("error", retry);
-      req.setTimeout(400, () => { req.destroy(); retry(); });
+      req.setTimeout(500, () => {
+        req.destroy();
+        retry();
+      });
     }
+
     function retry() {
-      if (Date.now() >= deadline) return reject(new Error("Backend did not start in time"));
+      if (Date.now() >= deadline) {
+        return reject(
+          new Error(
+            "Backend did not start within 45 seconds.\n\n" +
+            "Check logs at: " + path.join(app.getPath("userData"), "logs", "main.log")
+          )
+        );
+      }
       setTimeout(attempt, intervalMs);
     }
+
     attempt();
   });
 }
 
-function resolveBackendEntrypoint() {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, "backend", "main.py");
-  }
-  return path.join(app.getAppPath(), "backend", "main.py");
-}
-
+/* ---------------- BACKEND START ---------------- */
 function startBackend() {
   const dbPath = path.join(app.getPath("userData"), "inventory.db");
+
+  // Ensure userData dir exists (it always should, but be safe)
+  const userDataDir = app.getPath("userData");
+  if (!fs.existsSync(userDataDir)) {
+    fs.mkdirSync(userDataDir, { recursive: true });
+  }
+
+  log.info("[backend] DB_PATH =", dbPath);
+
   const env = {
     ...process.env,
     DB_PATH: dbPath,
+    BACKEND_PORT: "8000",
   };
 
-  const pythonExecutable = process.env.PYTHON_EXECUTABLE || "python";
-  const isDev = process.env.NODE_ENV === "development";
-  const backendArgs = ["-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"];
-  if (isDev) {
-    backendArgs.push("--reload", "--reload-dir", "backend");
+  let executable, args, options;
+
+  if (app.isPackaged) {
+    // Production: dist/backend/ folder is copied to resources/backend/ by extraResources
+    executable = path.join(process.resourcesPath, "backend", "backend.exe");
+
+    if (!fs.existsSync(executable)) {
+      const msg = `backend.exe not found at:\n${executable}\n\nThe app may not have been built correctly.`;
+      log.error("[backend]", msg);
+      dialog.showErrorBox("Backend Missing", msg);
+      app.quit();
+      return;
+    }
+
+    args = [];
+    options = { env, windowsHide: true, detached: false };
+  } else {
+    // Development: run uvicorn directly
+    executable = process.env.PYTHON_EXECUTABLE || "python";
+    args = [
+      "-m", "uvicorn", "backend.main:app",
+      "--host", "127.0.0.1",
+      "--port", "8000",
+      "--reload",
+      "--reload-dir", "backend",
+    ];
+    options = { cwd: app.getAppPath(), env, windowsHide: true };
   }
-  backendProcess = spawn(pythonExecutable, backendArgs, {
-    cwd: app.getAppPath(),
-    env,
-    windowsHide: true,
+
+  log.info(`[backend] spawning: ${executable}`);
+  backendProcess = spawn(executable, args, options);
+
+  backendProcess.stdout.on("data", (d) =>
+    log.info("[backend:stdout]", d.toString().trim())
+  );
+  backendProcess.stderr.on("data", (d) =>
+    log.info("[backend:stderr]", d.toString().trim())
+  );
+
+  backendProcess.on("error", (err) => {
+    log.error("[backend] spawn error:", err);
+    backendSpawnError = new Error(
+      `Failed to start backend process.\n\n${err.message}\n\nExecutable: ${executable}`
+    );
   });
 
-  backendProcess.stdout.on("data", (data) => log.info(`[backend] ${data}`));
-  backendProcess.stderr.on("data", (data) => log.info(`[backend] ${data}`));
-  backendProcess.on("error", (err) => {
-    log.error(`[backend] failed to start: ${err.message}`);
-    dialog.showErrorBox("Backend startup failed", `Could not start backend service.\n${err.message}`);
+  backendProcess.on("exit", (code, signal) => {
+    log.warn(`[backend] exited — code=${code} signal=${signal}`);
   });
-  backendProcess.on("exit", (code) => log.warn(`[backend] exited with code ${code}`));
-  log.info("[backend] process spawned, waiting for readiness...");
 }
 
+/* ---------------- WINDOW ---------------- */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 860,
+    show: false, // don't flash a white window before content loads
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false, // required: allows file:// page to call http://127.0.0.1
     },
   });
 
-  if (process.env.NODE_ENV === "development") {
-    mainWindow
-      .loadURL("http://localhost:5173")
-      .catch(() => {
-        mainWindow.loadURL(
-          "data:text/html;charset=utf-8,<html><body style='font-family:sans-serif;padding:24px;'><h2>Frontend dev server is not running.</h2><p>Start it with: <b>npm --prefix frontend run dev</b></p></body></html>",
-        );
-      });
+  mainWindow.once("ready-to-show", () => mainWindow.show());
+
+  if (!app.isPackaged) {
+    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(app.getAppPath(), "frontend", "dist", "index.html"));
+    // __dirname is electron/ inside the asar; frontend/dist is at asar root
+    const indexPath = path.join(__dirname, "..", "frontend", "dist", "index.html");
+    log.info("[window] loading:", indexPath);
+
+    mainWindow.loadFile(indexPath).catch((err) => {
+      log.error("[window] loadFile failed:", err);
+      mainWindow.loadURL(
+        `data:text/html,<pre style="font-family:monospace;padding:24px;color:red">` +
+        `Failed to load UI\n\nPath: ${indexPath}\nError: ${err.message}\n` +
+        `__dirname: ${__dirname}\nappPath: ${app.getAppPath()}</pre>`
+      );
+    });
   }
 }
 
+/* ---------------- AUTO UPDATER ---------------- */
 function setupAutoUpdate() {
-  autoUpdater.logger = log;
-  autoUpdater.autoDownload = false;
+  try {
+    autoUpdater.logger = log;
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on("update-available", async () => {
-    const choice = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      buttons: ["Download", "Later"],
-      title: "Update available",
-      message: "A new version is available. Download now?",
+    autoUpdater.on("update-available", async (info) => {
+      const res = await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        buttons: ["Download", "Later"],
+        title: "Update Available",
+        message: `Version ${info.version} is available. Download now?`,
+      });
+      if (res.response === 0) autoUpdater.downloadUpdate();
     });
 
-    if (choice.response === 0) {
-      autoUpdater.downloadUpdate();
-    }
-  });
-
-  autoUpdater.on("update-downloaded", async () => {
-    const choice = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      buttons: ["Install and Restart", "Later"],
-      title: "Update ready",
-      message: "Update downloaded. Install now?",
+    autoUpdater.on("update-downloaded", async () => {
+      const res = await dialog.showMessageBox(mainWindow, {
+        type: "info",
+        buttons: ["Install & Restart", "Later"],
+        title: "Update Ready",
+        message: "Update downloaded. Install now?",
+      });
+      if (res.response === 0) autoUpdater.quitAndInstall();
     });
 
-    if (choice.response === 0) {
-      autoUpdater.quitAndInstall();
-    }
-  });
+    autoUpdater.on("error", (err) => log.warn("Auto-update (non-critical):", err.message));
 
-  autoUpdater.checkForUpdatesAndNotify();
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((err) =>
+        log.warn("Update check skipped:", err.message)
+      );
+    }, 15000);
+  } catch (err) {
+    log.warn("Auto-updater init failed (non-critical):", err.message);
+  }
 }
 
+/* ---------------- APP LIFECYCLE ---------------- */
 app.whenReady().then(async () => {
   startBackend();
 
-  // Wait for uvicorn to be ready before loading the UI so we avoid ERR_CONNECTION_REFUSED
   try {
-    await waitForBackend(30000);
+    await waitForBackend();
+    log.info("[app] backend ready — creating window");
   } catch (err) {
-    log.error("[backend] startup timeout:", err.message);
+    log.error("[app] backend failed to start:", err.message);
     dialog.showErrorBox(
-      "Backend not responding",
-      "The backend server did not start within 30 seconds.\nCheck that Python and dependencies are installed correctly.",
+      "Backend Failed to Start",
+      err.message + "\n\nThe application will now close."
     );
+    app.quit();
+    return; // <-- critical: don't create window if backend is dead
   }
 
   createWindow();
@@ -145,63 +230,45 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (backendProcess) backendProcess.kill();
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
-  if (backendProcess) backendProcess.kill();
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
 });
 
+/* ---------------- IPC ---------------- */
 ipcMain.handle("app:getVersion", () => app.getVersion());
 
 ipcMain.handle("backup:create", async () => {
   const dbPath = path.join(app.getPath("userData"), "inventory.db");
-  if (!fs.existsSync(dbPath)) return { ok: false, message: "Database not found" };
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: "Create Backup",
-    defaultPath: `inventory-backup-${Date.now()}.backup`,
-    filters: [
-      { name: "Backup Files", extensions: ["backup"] },
-      { name: "SQLite DB", extensions: ["db"] },
-    ],
+  const res = await dialog.showSaveDialog(mainWindow, {
+    title: "Save Backup",
+    defaultPath: `inventory-backup-${Date.now()}.db`,
+    filters: [{ name: "SQLite Database", extensions: ["db"] }],
   });
-  if (result.canceled || !result.filePath) return { ok: false, message: "Backup cancelled" };
-  fs.copyFileSync(dbPath, result.filePath);
-  return { ok: true, path: result.filePath };
+  if (!res.filePath) return { ok: false };
+  fs.copyFileSync(dbPath, res.filePath);
+  log.info("[backup] saved to:", res.filePath);
+  return { ok: true };
 });
 
 ipcMain.handle("backup:restore", async () => {
-  const dbPath = path.join(app.getPath("userData"), "inventory.db");
-  const pick = await dialog.showOpenDialog(mainWindow, {
-    title: "Select Backup File",
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: "Restore Backup",
+    filters: [{ name: "SQLite Database", extensions: ["db"] }],
     properties: ["openFile"],
-    filters: [
-      { name: "Backup Files", extensions: ["backup", "db"] },
-      { name: "All Files", extensions: ["*"] },
-    ],
   });
-  if (pick.canceled || !pick.filePaths?.length) return { ok: false, message: "Restore cancelled" };
-  const source = pick.filePaths[0];
-  if (!fs.existsSync(source) || fs.statSync(source).size < 1024) {
-    return { ok: false, message: "Invalid backup file" };
-  }
-  const confirm = await dialog.showMessageBox(mainWindow, {
-    type: "warning",
-    title: "Confirm Restore",
-    message: "Restore will overwrite the current database and restart the app.",
-    buttons: ["Restore and Restart", "Cancel"],
-    defaultId: 1,
-    cancelId: 1,
-  });
-  if (confirm.response !== 0) return { ok: false, message: "Restore cancelled" };
-  try {
-    if (backendProcess) backendProcess.kill();
-    fs.copyFileSync(source, dbPath);
-    app.relaunch();
-    app.exit(0);
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: `Restore failed: ${error.message}` };
-  }
+  if (res.canceled || !res.filePaths[0]) return { ok: false };
+  const dbPath = path.join(app.getPath("userData"), "inventory.db");
+  fs.copyFileSync(res.filePaths[0], dbPath);
+  log.info("[backup] restored from:", res.filePaths[0]);
+  return { ok: true };
 });

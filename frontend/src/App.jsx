@@ -41,6 +41,10 @@ function Layout() {
   const navigate = useNavigate();
   const sidebarItems = useMemo(() => SIDEBAR_ITEMS.filter((item) => item.roles.includes(role)), [role]);
 
+  // For HashRouter, extract the current path from hash
+  const currentPath = location.hash ? location.hash.slice(1) : "/";
+
+
   const dispatchAction = (actionId) => {
     if (actionId === "app.commandPalette") return setShowPalette(true), true;
     if (actionId === "app.help") return setShowHelp(true), true;
@@ -102,7 +106,7 @@ function Layout() {
         <div className="flex-1">
           <header className="flex h-16 items-center justify-between border-b px-6" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
             <div>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{location.pathname}</p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{currentPath}</p>
               <p className="text-sm font-semibold">{companyName}</p>
             </div>
             <div className="flex items-center gap-3">
