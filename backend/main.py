@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.security import get_password_hash
 from backend.database import Base, SessionLocal, engine
+from backend.initDb import apply_startup_migrations
 from backend.models import OwnerShare, User
 from backend.routes import auth, expenses, finance, partners, products, reports, sales, settings, users
 
@@ -75,33 +76,6 @@ def seed_owner_user():
         db.commit()
     finally:
         db.close()
-
-
-def apply_startup_migrations():
-    with engine.begin() as conn:
-        columns = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
-        if "name" not in columns:
-            conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR(120)"))
-        if "email" not in columns:
-            conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(120)"))
-        if "status" not in columns:
-            conn.execute(text("ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active'"))
-        conn.execute(text("UPDATE users SET name = COALESCE(name, username, 'User')"))
-        conn.execute(text("UPDATE users SET email = COALESCE(email, username || '@inventory.local')"))
-        conn.execute(text("UPDATE users SET status = COALESCE(status, 'active')"))
-        product_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(products)")).fetchall()]
-        if "image_data" not in product_columns:
-            conn.execute(text("ALTER TABLE products ADD COLUMN image_data VARCHAR"))
-        if "image_mime" not in product_columns:
-            conn.execute(text("ALTER TABLE products ADD COLUMN image_mime VARCHAR(32)"))
-        product_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(products)")).fetchall()]
-        if "image_data" not in product_columns:
-            conn.execute(text("ALTER TABLE products ADD COLUMN image_data VARCHAR"))
-        if "image_mime" not in product_columns:
-            conn.execute(text("ALTER TABLE products ADD COLUMN image_mime VARCHAR(32)"))
-        product_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(products)")).fetchall()]
-        if "image_data" not in product_columns:
-            conn.execute(text("ALTER TABLE products ADD COLUMN image_data TEXT"))
 
 
 @app.on_event("startup")

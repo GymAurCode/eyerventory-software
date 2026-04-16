@@ -183,7 +183,14 @@ function setupAutoUpdate() {
         title: "Update Available",
         message: `Version ${info.version} is available. Download now?`,
       });
-      if (res.response === 0) autoUpdater.downloadUpdate();
+      if (res.response === 0) {
+        dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "Downloading Update",
+          message: "Update is downloading. You will be notified when ready.",
+        });
+        autoUpdater.downloadUpdate();
+      }
     });
 
     autoUpdater.on("update-downloaded", async () => {
@@ -198,11 +205,10 @@ function setupAutoUpdate() {
 
     autoUpdater.on("error", (err) => log.warn("Auto-update (non-critical):", err.message));
 
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch((err) =>
-        log.warn("Update check skipped:", err.message)
-      );
-    }, 15000);
+    // Check for updates immediately on startup
+    autoUpdater.checkForUpdates().catch((err) =>
+      log.warn("Update check skipped:", err.message)
+    );
   } catch (err) {
     log.warn("Auto-updater init failed (non-critical):", err.message);
   }

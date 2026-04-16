@@ -1,6 +1,6 @@
 {
   "name": "inventory-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",  
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
   "author": "Inventory Team",
@@ -50,6 +50,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "GymAurCode",  
+      "repo": "eyerventory-software" 
     }
   }
 }
