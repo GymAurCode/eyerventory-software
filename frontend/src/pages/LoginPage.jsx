@@ -6,8 +6,8 @@ import { useBranding } from "../contexts/BrandingContext";
 export default function LoginPage() {
   const { login, loading } = useAuth();
   const { companyName } = useBranding();
-  const [email, setEmail] = useState("owner@inventory.local");
-  const [password, setPassword] = useState("owner123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const onSubmit = async (e) => {
@@ -55,8 +55,8 @@ export default function LoginPage() {
               <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>Sign in to continue</p>
             </div>
             <form className="space-y-5" onSubmit={onSubmit}>
-              <div><label className="mb-2 block text-sm" style={{ color: "var(--text-secondary)" }}>Email / Username</label><input className="input" placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-              <div><label className="mb-2 block text-sm" style={{ color: "var(--text-secondary)" }}>Password</label><input className="input" type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+              <div><label className="mb-2 block text-sm" style={{ color: "var(--text-secondary)" }}>Email / Username</label><input className="input" placeholder="name@company.com" type="text" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div><label className="mb-2 block text-sm" style={{ color: "var(--text-secondary)" }}>Password</label><input className="input" type="password" placeholder="Enter your password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
               {error && <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
               <button className="btn-primary w-full py-3" disabled={loading}>{loading ? "Signing in..." : "Login"}</button>
             </form>

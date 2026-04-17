@@ -1,6 +1,6 @@
 const { spawnSync } = require("child_process");
 
-const python = process.env.PYTHON_EXECUTABLE || "python";
+const python = "D:\\inventroy-system\\eyerventory-software\\venv\\Scripts\\python.exe";
 const requiredPackages = [
   "uvicorn",
   "fastapi",
@@ -25,12 +25,20 @@ const check = spawnSync(
 if (check.error || check.status !== 0) {
   console.error(
     `\nThe selected Python interpreter cannot import all backend dependencies.\n` +
-      `Set PYTHON_EXECUTABLE to a Python install with the requirements from requirements.txt.`
+      `Ensure the venv at ${python} has the requirements from requirements.txt installed.`
   );
   process.exit(1);
 }
 
-const args = ["-m", "PyInstaller", "backend.spec"];
+const args = [
+  "-m", "PyInstaller",
+  "--onefile",
+  "--noconfirm",
+  "--runtime-hook", "pyinstaller_hooks/runtime_hook.py",
+  "backend/main.py",
+  "--distpath", "dist/backend",
+  "--name", "backend"
+];
 const result = spawnSync(python, args, { stdio: "inherit" });
 
 if (result.error) {

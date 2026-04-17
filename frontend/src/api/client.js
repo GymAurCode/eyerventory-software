@@ -36,8 +36,9 @@ export function setToken(token) {
 /**
  * Polls /api/health until the backend responds.
  * Used by main.jsx before mounting the React app.
+ * Uses aggressive polling (100ms) since Electron starts backend before loading frontend.
  */
-export async function waitForBackend(maxWaitMs = 30000, intervalMs = 700) {
+export async function waitForBackend(maxWaitMs = 10000, intervalMs = 100) {
   const deadline = Date.now() + maxWaitMs;
 
   while (Date.now() < deadline) {

@@ -49,5 +49,4 @@ def apply_startup_migrations():
         logger.info("Database migrations applied successfully")
     except Exception as e:
         logger.error(f"Database migration failed: {e}")
-        raise</content>
-<parameter name="filePath">d:\inventory-software\backend\initDb.py
+        raise

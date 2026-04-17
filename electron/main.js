@@ -12,6 +12,9 @@ log.transports.file.resolvePathFn = () =>
 log.transports.file.level = "info";
 log.transports.console.level = "debug";
 
+// Production safety flag
+const isDev = !app.isPackaged;
+
 let mainWindow;
 let backendProcess;
 let backendSpawnError = null; // set if spawn itself fails
@@ -76,6 +79,7 @@ function startBackend() {
   }
 
   log.info("[backend] DB_PATH =", dbPath);
+  log.info("[backend] Environment: " + (isDev ? "DEVELOPMENT" : "PRODUCTION (app.isPackaged=true)"));
 
   const env = {
     ...process.env,
@@ -83,36 +87,82 @@ function startBackend() {
     BACKEND_PORT: "8000",
   };
 
-  let executable, args, options;
+  let executable, args, options, backendDir;
 
-  if (app.isPackaged) {
-    // Production: dist/backend/ folder is copied to resources/backend/ by extraResources
-    executable = path.join(process.resourcesPath, "backend", "backend.exe");
+  if (isDev) {
+    // Development: using Python + uvicorn for live reload during development
+    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
 
     if (!fs.existsSync(executable)) {
-      const msg = `backend.exe not found at:\n${executable}\n\nThe app may not have been built correctly.`;
+      const msg = `Python executable not found at:\n${executable}\n\nEnsure the venv is set up correctly.\n\nRun: python -m venv venv && .\\venv\\Scripts\\activate && pip install -r requirements.txt`;
       log.error("[backend]", msg);
-      dialog.showErrorBox("Backend Missing", msg);
+      dialog.showErrorBox("Python venv Not Found", msg);
       app.quit();
       return;
     }
 
-    args = [];
-    options = { env, windowsHide: true, detached: false };
-  } else {
-    // Development: run uvicorn directly
-    executable = process.env.PYTHON_EXECUTABLE || "python";
     args = [
       "-m", "uvicorn", "backend.main:app",
       "--host", "127.0.0.1",
       "--port", "8000",
       "--reload",
-      "--reload-dir", "backend",
     ];
-    options = { cwd: app.getAppPath(), env, windowsHide: true };
+    options = { 
+      env, 
+      windowsHide: true, 
+      detached: false,
+      cwd: app.getAppPath()
+    };
+  } else {
+    // Production: backend.exe in resources/backend folder (via extraResources)
+    backendDir = path.join(process.resourcesPath, "backend");
+    executable = path.join(backendDir, "backend.exe");
+
+    log.info("[backend] process.resourcesPath:", process.resourcesPath);
+    log.info("[backend] backendDir:", backendDir);
+    log.info("[backend] expectedExecutable:", executable);
+
+    if (!fs.existsSync(backendDir)) {
+      const msg = `Backend resources folder not found at:\n${backendDir}\n\nThe app was not packaged correctly.`;
+      log.error("[backend]", msg);
+      log.error("[backend] process.resourcesPath:", process.resourcesPath);
+      log.error("[backend] Contents of process.resourcesPath:", fs.readdirSync(process.resourcesPath).join(", "));
+      dialog.showErrorBox("Backend Resources Missing", msg);
+      app.quit();
+      return;
+    }
+
+    if (!fs.existsSync(executable)) {
+      const msg = `backend.exe not found at:\n${executable}\n\nThe app may not have been built correctly.`;
+      log.error("[backend]", msg);
+      log.error("[backend] Contents of backendDir:", fs.readdirSync(backendDir).join(", "));
+      dialog.showErrorBox("Backend Executable Missing", msg);
+      app.quit();
+      return;
+    }
+
+    args = [];
+    options = { 
+      env, 
+      windowsHide: true, 
+      detached: false,
+      cwd: backendDir
+    };
   }
 
+  // Verify executable file is readable
+  try {
+    fs.accessSync(executable, fs.constants.X_OK);
+    log.info("[backend] executable is readable and executable");
+  } catch (err) {
+    log.warn("[backend] executable may not be executable:", err.message);
+  }
+
+  log.info(`[backend] isDev=${isDev}`);
   log.info(`[backend] spawning: ${executable}`);
+  log.info(`[backend] args: ${JSON.stringify(args)}`);
+  log.info(`[backend] cwd: ${options.cwd}`);
+
   backendProcess = spawn(executable, args, options);
 
   backendProcess.stdout.on("data", (d) =>
@@ -125,13 +175,18 @@ function startBackend() {
   backendProcess.on("error", (err) => {
     log.error("[backend] spawn error:", err);
     backendSpawnError = new Error(
-      `Failed to start backend process.\n\n${err.message}\n\nExecutable: ${executable}`
+      `Failed to start backend process.\n\n${err.message}\n\nExecutable: ${executable}\nArgs: ${JSON.stringify(args)}`
     );
   });
 
   backendProcess.on("exit", (code, signal) => {
     log.warn(`[backend] exited — code=${code} signal=${signal}`);
   });
+
+  // Log PID for debugging
+  if (backendProcess.pid) {
+    log.info(`[backend] started with PID: ${backendProcess.pid}`);
+  }
 }
 
 /* ---------------- WINDOW ---------------- */
@@ -150,12 +205,12 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
 
-  if (!app.isPackaged) {
+  if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
     mainWindow.webContents.openDevTools();
   } else {
-    // __dirname is electron/ inside the asar; frontend/dist is at asar root
-    const indexPath = path.join(__dirname, "..", "frontend", "dist", "index.html");
+    // Production: load from packaged files
+    const indexPath = path.join(process.resourcesPath, 'app.asar', 'frontend', 'dist', 'index.html');
     log.info("[window] loading:", indexPath);
 
     mainWindow.loadFile(indexPath).catch((err) => {
@@ -163,8 +218,29 @@ function createWindow() {
       mainWindow.loadURL(
         `data:text/html,<pre style="font-family:monospace;padding:24px;color:red">` +
         `Failed to load UI\n\nPath: ${indexPath}\nError: ${err.message}\n` +
-        `__dirname: ${__dirname}\nappPath: ${app.getAppPath()}</pre>`
+        `__dirname: ${__dirname}\nappPath: ${app.getAppPath()}\nresourcesPath: ${process.resourcesPath}</pre>`
       );
+    });
+  }
+
+  // Prevent DevTools from opening in production
+  if (!isDev) {
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      // Block F12, Ctrl+Shift+I, Ctrl+Shift+C, Ctrl+Shift+J, Ctrl+Shift+K
+      if (
+        input.key === "F12" ||
+        (input.control && input.shift && input.key.toLowerCase() === "i") ||
+        (input.control && input.shift && input.key.toLowerCase() === "c") ||
+        (input.control && input.shift && input.key.toLowerCase() === "j") ||
+        (input.control && input.shift && input.key.toLowerCase() === "k")
+      ) {
+        event.preventDefault();
+      }
+    });
+
+    // Close DevTools if user somehow manages to open it
+    mainWindow.webContents.on("devtools-opened", () => {
+      mainWindow.webContents.closeDevTools();
     });
   }
 }
