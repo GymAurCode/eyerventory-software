@@ -32,12 +32,8 @@ if (check.error || check.status !== 0) {
 
 const args = [
   "-m", "PyInstaller",
-  "--onefile",
   "--noconfirm",
-  "--runtime-hook", "pyinstaller_hooks/runtime_hook.py",
-  "backend/main.py",
-  "--distpath", "dist/backend",
-  "--name", "backend"
+  "backend.spec"
 ];
 const result = spawnSync(python, args, { stdio: "inherit" });
 
