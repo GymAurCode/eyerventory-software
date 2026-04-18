@@ -46,7 +46,55 @@ def apply_startup_migrations():
             # if "new_column" not in sales_columns:
             #     conn.execute(text("ALTER TABLE sales ADD COLUMN new_column TYPE"))
             
+        # Migrate default user emails from @inventory.local → @eyerflow.com
+        _migrate_default_emails(conn)
+
         logger.info("Database migrations applied successfully")
     except Exception as e:
         logger.error(f"Database migration failed: {e}")
         raise
+
+
+def _migrate_default_emails(conn):
+    """
+    Safely renames legacy default emails to the new domain.
+    - Only touches rows that still have the old email.
+    - Never changes passwords or any other field.
+    - Skips if already migrated.
+    """
+    migrations = [
+        ("owner@inventory.local", "owner@eyerflow.com", "owner"),
+        ("staff@inventory.local", "staff@eyerflow.com", "staff"),
+    ]
+
+    for old_email, new_email, role in migrations:
+        old_user = conn.execute(
+            text("SELECT id FROM users WHERE email = :e"), {"e": old_email}
+        ).fetchone()
+
+        if old_user:
+            # Check the new email isn't already taken by a different user
+            conflict = conn.execute(
+                text("SELECT id FROM users WHERE email = :e AND id != :id"),
+                {"e": new_email, "id": old_user[0]},
+            ).fetchone()
+
+            if conflict:
+                logger.warning(
+                    f"Cannot migrate {old_email} → {new_email}: target email already exists on a different user"
+                )
+                continue
+
+            conn.execute(
+                text("UPDATE users SET email = :new, username = :new WHERE email = :old"),
+                {"new": new_email, "old": old_email},
+            )
+            logger.info(f"{role.capitalize()} email updated: {old_email} → {new_email}")
+        else:
+            already = conn.execute(
+                text("SELECT id FROM users WHERE email = :e"), {"e": new_email}
+            ).fetchone()
+            if already:
+                logger.info(f"{role.capitalize()} email already updated ({new_email}), skipping")
+            else:
+                logger.info(f"{role.capitalize()} default user not found — will be seeded by seed_owner_user()")

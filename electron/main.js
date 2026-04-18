@@ -15,6 +15,27 @@ log.transports.console.level = "debug";
 // Production safety flag
 const isDev = !app.isPackaged;
 
+/* ---------------- USERDATA MIGRATION ---------------- */
+// Migrate old "Eyerventory" userData to "EyerFlow" if needed
+(function migrateUserData() {
+  const oldDir = path.join(app.getPath("appData"), "Eyerventory");
+  const newDir = app.getPath("userData"); // now resolves to .../EyerFlow
+  if (fs.existsSync(oldDir) && !fs.existsSync(path.join(newDir, ".migrated"))) {
+    try {
+      if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true });
+      for (const entry of fs.readdirSync(oldDir)) {
+        const src = path.join(oldDir, entry);
+        const dest = path.join(newDir, entry);
+        if (!fs.existsSync(dest)) fs.cpSync(src, dest, { recursive: true });
+      }
+      fs.writeFileSync(path.join(newDir, ".migrated"), "1");
+      log.info("[migration] userData migrated from Eyerventory → EyerFlow");
+    } catch (err) {
+      log.warn("[migration] userData migration failed (non-critical):", err.message);
+    }
+  }
+})();
+
 let mainWindow;
 let backendProcess;
 let backendSpawnError = null; // set if spawn itself fails
@@ -194,7 +215,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 860,
-    show: false, // don't flash a white window before content loads
+    title: "EyerFlow",
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

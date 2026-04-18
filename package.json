@@ -1,9 +1,9 @@
 {
-  "name": "inventory-desktop",
+  "name": "EyerFlow",
   "version": "1.0.2",  
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
-  "author": "Inventory Team",
+  "author": "Eyercall",
   "license": "MIT",
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
@@ -26,8 +26,9 @@
     "wait-on": "^8.0.3"
   },
   "build": {
-    "appId": "com.company.inventorydesktop",
-    "productName": "Inventory Desktop",
+    "appId": "com.eyerflow.app",
+    "productName": "EyerFlow",
+    "artifactName": "EyerFlow Setup ${version}.${ext}",
     "files": [
       "electron/**/*",
       "frontend/dist/**/*"
@@ -51,12 +52,16 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico"
+      "uninstallerIcon": "assets/icon.ico",
+      "shortcutName": "EyerFlow",
+      "installerHeader": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "publish": {
       "provider": "github",
       "owner": "GymAurCode",  
-      "repo": "eyerventory-software" 
+      "repo": "eyerflow-software" 
     }
   }
 }

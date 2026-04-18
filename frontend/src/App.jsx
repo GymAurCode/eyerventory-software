@@ -83,7 +83,7 @@ function Layout() {
   );
 
   useEffect(() => {
-    const key = "eyerventory_guide_seen";
+    const key = "eyerflow_guide_seen";
     if (!localStorage.getItem(key)) {
       setShowGuide(true);
       localStorage.setItem(key, "1");

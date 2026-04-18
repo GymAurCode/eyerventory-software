@@ -42,32 +42,25 @@ def seed_owner_user():
     db: Session = SessionLocal()
     try:
         defaults = [
-            {"name": "Owner Admin", "email": "owner@inventory.local", "password": "owner123", "role": "owner"},
-            {"name": "Staff User", "email": "staff@inventory.local", "password": "staff123", "role": "staff"},
+            {"name": "Owner Admin", "email": "owner@eyerflow.com", "password": "owner123", "role": "owner"},
+            {"name": "Staff User", "email": "staff@eyerflow.com", "password": "staff123", "role": "staff"},
         ]
         for item in defaults:
             user = db.query(User).filter(User.email == item["email"]).first()
-            hashed = get_password_hash(item["password"])
             if not user:
+                # Only create if truly missing (migration didn't find old user either)
                 db.add(
                     User(
                         username=item["email"],
                         name=item["name"],
                         email=item["email"],
-                        hashed_password=hashed,
+                        hashed_password=get_password_hash(item["password"]),
                         role=item["role"],
                         status="active",
                         is_active=True,
                     )
                 )
-            else:
-                user.username = item["email"]
-                user.name = item["name"]
-                user.email = item["email"]
-                user.hashed_password = hashed
-                user.role = item["role"]
-                user.status = "active"
-                user.is_active = True
+            # Existing users: do NOT touch password or any other field
         db.flush()
         owners = db.query(User).filter(User.role == "owner").all()
         for owner in owners:
