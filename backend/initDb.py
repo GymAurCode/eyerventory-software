@@ -46,8 +46,8 @@ def apply_startup_migrations():
             # if "new_column" not in sales_columns:
             #     conn.execute(text("ALTER TABLE sales ADD COLUMN new_column TYPE"))
             
-        # Migrate default user emails from @inventory.local → @eyerflow.com
-        _migrate_default_emails(conn)
+            # Migrate default user emails from @inventory.local → @eyerflow.com
+            _migrate_default_emails(conn)
 
         logger.info("Database migrations applied successfully")
     except Exception as e:
