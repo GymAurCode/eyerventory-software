@@ -45,7 +45,7 @@ let backendSpawnError = null; // set if spawn itself fails
  * Polls /api/health until the backend responds or we time out.
  * Rejects immediately if the spawn already errored.
  */
-function waitForBackend(maxWaitMs = 45000, intervalMs = 600) {
+function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + maxWaitMs;
 
@@ -77,7 +77,7 @@ function waitForBackend(maxWaitMs = 45000, intervalMs = 600) {
       if (Date.now() >= deadline) {
         return reject(
           new Error(
-            "Backend did not start within 45 seconds.\n\n" +
+            "Backend did not start within 90 seconds.\n\n" +
             "Check logs at: " + path.join(app.getPath("userData"), "logs", "main.log")
           )
         );
