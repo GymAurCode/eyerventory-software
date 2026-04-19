@@ -33,6 +33,7 @@ if (check.error || check.status !== 0) {
 const args = [
   "-m", "PyInstaller",
   "--noconfirm",
+  "--distpath", "dist/backend",
   "backend.spec"
 ];
 const result = spawnSync(python, args, { stdio: "inherit" });
