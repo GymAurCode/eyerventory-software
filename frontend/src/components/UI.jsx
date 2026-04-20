@@ -44,13 +44,17 @@ function CountUpValue({ value, duration = 0.8, formatter = (v) => v }) {
 export function StatCard({ title, value, tone = "indigo", money = false }) {
   const cfg = toneStyles[tone] || toneStyles.indigo;
   const formatter = useMemo(() => (money ? (val) => formatPKR(Math.round(val)) : (val) => Math.round(val).toLocaleString()), [money]);
+  
+  // Use dark border color and inset border in both light and dark themes
+  const boxShadowStyle = `0 0 0 1px ${cfg.border} inset, 0 8px 26px ${cfg.glow}`;
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
       className="panel panel-hover"
-      style={{ borderColor: cfg.border, boxShadow: `0 0 0 1px ${cfg.border} inset, 0 8px 26px ${cfg.glow}` }}
+      style={{ borderColor: cfg.border, boxShadow: boxShadowStyle }}
     >
       <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{title}</p>
       <p className="mt-2 text-xl font-semibold">
