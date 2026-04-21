@@ -1,5 +1,5 @@
 {
-  "name": "EyerFlow",
+  "name": "eyerflow",
   "version": "1.0.4",  
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
