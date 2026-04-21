@@ -77,7 +77,7 @@
       {
         "provider": "github",
         "owner": "GymAurCode",
-        "repo": "eyerflow-software",
+        "repo": "eyerventory-software",
         "releaseType": "release",
         "publishAutoUpdate": true
       }

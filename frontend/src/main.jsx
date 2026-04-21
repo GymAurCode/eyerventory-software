@@ -112,7 +112,7 @@ const styles = {
     fontSize: "13px",
   },
   button: {
-    background: "#3b82f6",
+    background: "#282950",
     color: "#fff",
     border: "none",
     borderRadius: "8px",
