@@ -269,46 +269,131 @@ function createWindow() {
 
 /* ---------------- AUTO UPDATER ---------------- */
 function setupAutoUpdate() {
+  // Only check for updates in production
+  if (isDev) {
+    log.info("[updater] skipping auto-update check in development mode");
+    return;
+  }
+
   try {
+    log.info("[updater] ========== AUTO UPDATE SYSTEM INIT ==========");
+    log.info("[updater] app version:", app.getVersion());
+    log.info("[updater] app.isPackaged:", app.isPackaged);
+    log.info("[updater] platform:", process.platform);
+    log.info("[updater] arch:", process.arch);
+
+    // Configure updater
     autoUpdater.logger = log;
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
 
+    // Log update source configuration
+    log.info("[updater] checking update config...");
+    const updateConfig = autoUpdater.currentAppData;
+    if (updateConfig) {
+      log.info("[updater] currentAppData:", JSON.stringify(updateConfig, null, 2));
+    }
+
+    // ===== UPDATE AVAILABLE =====
     autoUpdater.on("update-available", async (info) => {
+      log.info("[updater] UPDATE AVAILABLE");
+      log.info("[updater]   current version: " + app.getVersion());
+      log.info("[updater]   new version: " + info.version);
+      log.info("[updater]   release date: " + info.releaseDate);
+      log.info("[updater]   release notes: " + (info.releaseNotes ? "present" : "none"));
+
       const res = await dialog.showMessageBox(mainWindow, {
         type: "info",
         buttons: ["Download", "Later"],
-        title: "Update Available",
-        message: `Version ${info.version} is available. Download now?`,
+        title: "🔄 Update Available",
+        message: `Version ${info.version} is available.\n\nYour current version: ${app.getVersion()}\n\nDownload now?`,
+        detail: `New version: ${info.version}\nRelease Date: ${info.releaseDate || "N/A"}`,
       });
+
       if (res.response === 0) {
+        log.info("[updater] user accepted update download");
         dialog.showMessageBox(mainWindow, {
           type: "info",
           title: "Downloading Update",
-          message: "Update is downloading. You will be notified when ready.",
+          message: "Update is downloading. You will be notified when ready to install.",
         });
         autoUpdater.downloadUpdate();
+      } else {
+        log.info("[updater] user deferred update");
       }
     });
 
-    autoUpdater.on("update-downloaded", async () => {
+    // ===== UPDATE NOT AVAILABLE =====
+    autoUpdater.on("update-not-available", (info) => {
+      log.info("[updater] UPDATE NOT AVAILABLE");
+      log.info("[updater]   current version: " + app.getVersion());
+      log.info(`[updater]   latest version: ${info.version || 'unknown'}`);
+      log.info("[updater]   you are on the latest version");
+    });
+
+    // ===== DOWNLOAD PROGRESS =====
+    autoUpdater.on("download-progress", (progress) => {
+      const percent = Math.round(progress.percent);
+      const transferred = Math.round(progress.transferred / 1024 / 1024);
+      const total = Math.round(progress.total / 1024 / 1024);
+      log.info(
+        `[updater] DOWNLOAD PROGRESS: ${percent}% (${transferred}MB / ${total}MB)`
+      );
+    });
+
+    // ===== UPDATE DOWNLOADED =====
+    autoUpdater.on("update-downloaded", async (info) => {
+      log.info("[updater] UPDATE DOWNLOADED - ready to install");
+      log.info(`[updater]   version: ${info.version}`);
+
       const res = await dialog.showMessageBox(mainWindow, {
         type: "info",
         buttons: ["Install & Restart", "Later"],
-        title: "Update Ready",
-        message: "Update downloaded. Install now?",
+        title: "⬇️ Update Ready to Install",
+        message: `Version ${info.version} is ready to install.\n\nRestart now to apply the update?`,
+        detail: "The app will restart to complete the installation.",
       });
-      if (res.response === 0) autoUpdater.quitAndInstall();
+
+      if (res.response === 0) {
+        log.info("[updater] user approved install and restart");
+        autoUpdater.quitAndInstall();
+      } else {
+        log.info("[updater] user deferred install");
+      }
     });
 
-    autoUpdater.on("error", (err) => log.warn("Auto-update (non-critical):", err.message));
+    // ===== ERROR HANDLER =====
+    autoUpdater.on("error", (err) => {
+      log.error("[updater] ERROR during update check:");
+      log.error(`[updater]   message: ${err.message}`);
+      log.error(`[updater]   code: ${err.code}`);
+      log.error(`[updater]   stack: ${err.stack}`);
+    });
 
-    // Check for updates immediately on startup
-    autoUpdater.checkForUpdates().catch((err) =>
-      log.warn("Update check skipped:", err.message)
-    );
+    // ===== CHECKING FOR UPDATE =====
+    autoUpdater.on("checking-for-update", () => {
+      log.info("[updater] CHECKING FOR UPDATE...");
+      log.info("[updater]   github owner: GymAurCode");
+      log.info("[updater]   github repo: eyerflow-software");
+      log.info("[updater]   current version: " + app.getVersion());
+    });
+
+    // Start update check after a short delay to ensure window is ready
+    log.info("[updater] scheduling update check for 2 seconds from now...");
+    setTimeout(() => {
+      log.info("[updater] initiating update check");
+      autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+        log.error(
+          "[updater] checkForUpdatesAndNotify failed:",
+          err.message
+        );
+      });
+    }, 2000);
+
+    log.info("[updater] ============================================");
   } catch (err) {
-    log.warn("Auto-updater init failed (non-critical):", err.message);
+    log.error("[updater] FATAL - setup failed:", err.message);
+    log.error(`[updater] stack: ${err.stack}`);
   }
 }
 
@@ -330,7 +415,11 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
-  setupAutoUpdate();
+  
+  // Only setup auto-updater in production
+  if (app.isPackaged) {
+    setupAutoUpdate();
+  }
 });
 
 app.on("window-all-closed", () => {
@@ -350,6 +439,38 @@ app.on("before-quit", () => {
 
 /* ---------------- IPC ---------------- */
 ipcMain.handle("app:getVersion", () => app.getVersion());
+
+// Manual update check (for testing or user-triggered checks)
+ipcMain.handle("app:checkForUpdates", async () => {
+  if (!app.isPackaged) {
+    log.warn("[ipc] update check requested in development mode - ignoring");
+    return { ok: false, message: "Updates disabled in development mode" };
+  }
+
+  try {
+    log.info("[ipc] manual update check requested");
+    const result = await autoUpdater.checkForUpdates();
+    
+    if (result && result.updateInfo) {
+      log.info("[ipc] update check result:", JSON.stringify(result.updateInfo, null, 2));
+      return {
+        ok: true,
+        currentVersion: app.getVersion(),
+        latestVersion: result.updateInfo.version,
+        updateAvailable: result.updateInfo.version > app.getVersion(),
+      };
+    }
+    
+    return {
+      ok: true,
+      currentVersion: app.getVersion(),
+      updateAvailable: false,
+    };
+  } catch (err) {
+    log.error("[ipc] manual update check failed:", err.message);
+    return { ok: false, message: err.message };
+  }
+});
 
 ipcMain.handle("backup:create", async () => {
   const dbPath = path.join(app.getPath("userData"), "inventory.db");

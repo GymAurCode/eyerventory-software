@@ -1,6 +1,6 @@
 {
   "name": "EyerFlow",
-  "version": "1.0.3",  
+  "version": "1.0.4",  
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
   "author": "Eyercall",
@@ -28,7 +28,7 @@
   "build": {
     "appId": "com.eyerflow.app",
     "productName": "EyerFlow",
-    "artifactName": "EyerFlow Setup ${version}.${ext}",
+    "artifactName": "EyerFlow-${version}.${ext}",
     "files": [
       "electron/**/*",
       "frontend/dist/**/*"
@@ -42,26 +42,45 @@
       }
     ],
     "directories": {
-      "buildResources": "build"
+      "buildResources": "assets"
     },
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "certificateFile": null,
+      "certificatePassword": null,
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "sign": null
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EyerFlow",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
-      "shortcutName": "EyerFlow",
       "installerHeader": "assets/icon.ico",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "installerSidebar": null,
+      "include": null
     },
-    "publish": {
-      "provider": "github",
-      "owner": "GymAurCode",  
-      "repo": "eyerflow-software" 
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "GymAurCode",
+        "repo": "eyerflow-software",
+        "releaseType": "release",
+        "publishAutoUpdate": true
+      }
+    ]
   }
 }
