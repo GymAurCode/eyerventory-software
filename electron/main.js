@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const { spawn } = require("child_process");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
@@ -58,9 +59,11 @@ const isDev = !app.isPackaged;
 })();
 
 let mainWindow;
-let backendProcess;
+let backendProcess = null;
 let licenseBackendProcess;  // License service process (port 8001)
 let backendSpawnError = null; // set if spawn itself fails
+const BACKEND_HOST = "127.0.0.1";
+const BACKEND_PORT = "8000";
 
 /* ---------------- BACKEND READY CHECK ---------------- */
 /**
@@ -77,7 +80,7 @@ function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
         return reject(backendSpawnError);
       }
 
-      const req = http.get("http://127.0.0.1:8000/api/health", (res) => {
+      const req = http.get(`http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`, (res) => {
         if (res.statusCode < 500) {
           log.info("[backend] health check passed");
           resolve();
@@ -108,6 +111,24 @@ function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
     }
 
     attempt();
+  });
+}
+
+function isPortInUse(port, host = BACKEND_HOST) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        resolve(true);
+      } else {
+        log.warn(`[backend] port check error on ${host}:${port}:`, err.message);
+        resolve(false);
+      }
+    });
+    server.once("listening", () => {
+      server.close(() => resolve(false));
+    });
+    server.listen(port, host);
   });
 }
 
@@ -149,7 +170,18 @@ function startLicenseBackend() {
 }
 
 /* ---------------- BACKEND START ---------------- */
-function startBackend() {
+async function startBackend() {
+  if (backendProcess) {
+    log.warn("[backend] already running, skipping duplicate start");
+    return;
+  }
+
+  const portInUse = await isPortInUse(Number(BACKEND_PORT), BACKEND_HOST);
+  if (portInUse) {
+    log.warn(`[backend] port ${BACKEND_HOST}:${BACKEND_PORT} already in use, skipping backend spawn`);
+    return;
+  }
+
   const dbPath = path.join(app.getPath("userData"), "inventory.db");
 
   // Ensure userData dir exists (it always should, but be safe)
@@ -164,40 +196,17 @@ function startBackend() {
   const env = {
     ...process.env,
     DB_PATH: dbPath,
-    BACKEND_PORT: "8000",
+    BACKEND_PORT,
   };
 
   let executable, args, options, backendDir;
 
-  if (isDev) {
-    // Development: using Python + uvicorn for live reload during development
-    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
-
-    if (!fs.existsSync(executable)) {
-      const msg = `Python executable not found at:\n${executable}\n\nEnsure the venv is set up correctly.\n\nRun: python -m venv venv && .\\venv\\Scripts\\activate && pip install -r requirements.txt`;
-      log.error("[backend]", msg);
-      dialog.showErrorBox("Python venv Not Found", msg);
-      app.quit();
-      return;
-    }
-
-    args = [
-      "-m", "uvicorn", "backend.main:app",
-      "--host", "127.0.0.1",
-      "--port", "8000",
-      "--reload",
-    ];
-    options = { 
-      env, 
-      windowsHide: true, 
-      detached: false,
-      cwd: app.getAppPath()
-    };
-  } else {
+  if (app.isPackaged) {
     // Production: backend.exe in resources/backend folder (via extraResources)
     backendDir = path.join(process.resourcesPath, "backend");
     executable = path.join(backendDir, "backend.exe");
 
+    log.info("[backend] mode=production (backend.exe)");
     log.info("[backend] process.resourcesPath:", process.resourcesPath);
     log.info("[backend] backendDir:", backendDir);
     log.info("[backend] expectedExecutable:", executable);
@@ -222,11 +231,35 @@ function startBackend() {
     }
 
     args = [];
+    options = {
+      env,
+      windowsHide: true,
+      detached: false,
+      cwd: backendDir
+    };
+  } else {
+    // Development: using Python + uvicorn for live reload during development
+    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
+
+    if (!fs.existsSync(executable)) {
+      const msg = `Python executable not found at:\n${executable}\n\nEnsure the venv is set up correctly.\n\nRun: python -m venv venv && .\\venv\\Scripts\\activate && pip install -r requirements.txt`;
+      log.error("[backend]", msg);
+      dialog.showErrorBox("Python venv Not Found", msg);
+      app.quit();
+      return;
+    }
+
+    args = [
+      "-m", "uvicorn", "backend.main:app",
+      "--host", BACKEND_HOST,
+      "--port", BACKEND_PORT,
+      "--reload",
+    ];
     options = { 
       env, 
       windowsHide: true, 
       detached: false,
-      cwd: backendDir
+      cwd: app.getAppPath()
     };
   }
 
@@ -261,6 +294,7 @@ function startBackend() {
 
   backendProcess.on("exit", (code, signal) => {
     log.warn(`[backend] exited — code=${code} signal=${signal}`);
+    backendProcess = null;
   });
 
   // Log PID for debugging
@@ -458,7 +492,7 @@ function setupAutoUpdate() {
 
 /* ---------------- APP LIFECYCLE ---------------- */
 app.whenReady().then(async () => {
-  startBackend();
+  await startBackend();
   startLicenseBackend();  // Start license service (port 8001)
 
   try {

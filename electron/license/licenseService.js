@@ -12,15 +12,10 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const http = require("http");
+const { LICENSE_SERVER_URL } = require("../config/license");
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-// Read at call time (not module load time) so the .env loader in main.js
-// has already populated process.env before this value is used.
-function getLicenseServer() {
-  return process.env.LICENSE_SERVER_URL || "http://127.0.0.1:8001";
-}
 const AES_KEY_SEED = "eyerflow-aes-key-seed-v1"; // deterministic key derivation
 const TOKEN_FILE = "license.enc";
 
@@ -145,7 +140,8 @@ function _post(urlStr, body) {
  */
 async function activateLicense(userDataDir, licenseKey) {
   const machineId = getMachineId();
-  const licenseServer = getLicenseServer();
+  const licenseServer = LICENSE_SERVER_URL;
+  console.log("[LICENSE] Using server:", LICENSE_SERVER_URL);
   // Strip trailing slash to avoid double-slash in URL
   const baseUrl = licenseServer.replace(/\/$/, "");
   try {
