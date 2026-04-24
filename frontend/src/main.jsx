@@ -4,6 +4,7 @@ import { HashRouter } from "react-router-dom";
 import { Toaster } from "sonner";
 import App from "./App";
 import "./index.css";
+import LicenseGate from "./components/LicenseGate";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { waitForBackend } from "./api/client";
 
@@ -140,10 +141,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <HashRouter>
       <ThemeProvider>
-        <BackendGate>
-          <App />
-          <ThemeAwareToaster />
-        </BackendGate>
+        <LicenseGate>
+          <BackendGate>
+            <App />
+            <ThemeAwareToaster />
+          </BackendGate>
+        </LicenseGate>
       </ThemeProvider>
     </HashRouter>
   </React.StrictMode>

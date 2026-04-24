@@ -15,6 +15,9 @@ import ReportsPage from "./pages/ReportsPage";
 import SalesPage from "./pages/SalesPage";
 import SettingsPage from "./pages/SettingsPage";
 import UsersPage from "./pages/UsersPage";
+// HR Module pages
+import BackupPage from "./pages/hr/BackupPage";
+import HRManagementPage from "./pages/hr/HRManagementPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { BrandingProvider, useBranding } from "./contexts/BrandingContext";
 import { ShortcutProvider } from "./contexts/ShortcutContext";
@@ -129,6 +132,9 @@ function Layout() {
                 <Route path="/users" element={<ProtectedRoute allow={["owner"]}><UsersPage /></ProtectedRoute>} />
                 <Route path="/reports" element={<ProtectedRoute allow={["owner"]}><ReportsPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
+                {/* HR Module — single unified page with tabs */}
+                <Route path="/hr" element={<ProtectedRoute allow={["owner", "admin", "hr"]}><HRManagementPage /></ProtectedRoute>} />
+                <Route path="/hr/backup" element={<ProtectedRoute allow={["owner"]}><BackupPage /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to={role === "staff" ? "/products" : "/"} replace />} />
               </Routes>
             </Suspense>

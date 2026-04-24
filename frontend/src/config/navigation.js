@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Database,
   FileText,
   Handshake,
   Insights,
@@ -7,6 +8,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  UserCheck,
   Users,
   Wallet,
 } from "../components/icons/SidebarIcons";
@@ -22,4 +24,6 @@ export const SIDEBAR_ITEMS = [
   { label: "Partners", route: "/partners", icon: Handshake, roles: ["owner"] },
   { label: "Reports", route: "/reports", icon: FileText, roles: ["owner"] },
   { label: "Settings", route: "/settings", icon: Settings, roles: ["owner"] },
+  { label: "HR Management", route: "/hr", icon: UserCheck, roles: ["owner", "admin", "hr"] },
+  { label: "Backup", route: "/hr/backup", icon: Database, roles: ["owner"] },
 ];

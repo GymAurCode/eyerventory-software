@@ -149,3 +149,72 @@ export function Trash2(props) {
     </BaseIcon>
   );
 }
+
+export function UserCheck(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </BaseIcon>
+  );
+}
+
+export function ClipboardList(props) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M9 12h6M9 16h4" />
+    </BaseIcon>
+  );
+}
+
+export function CalendarCheck(props) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="m9 16 2 2 4-4" />
+    </BaseIcon>
+  );
+}
+
+export function DollarSign(props) {
+  return (
+    <BaseIcon {...props}>
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </BaseIcon>
+  );
+}
+
+export function CreditCard(props) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="1" y="4" width="22" height="16" rx="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </BaseIcon>
+  );
+}
+
+export function CalendarOff(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M4.18 4.18A2 2 0 0 0 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 1.82-1.18" />
+      <path d="M21 15.5V6a2 2 0 0 0-2-2H9.5" />
+      <path d="M16 2v4M3 10h7M21 10h-2.5" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </BaseIcon>
+  );
+}
+
+export function Database(props) {
+  return (
+    <BaseIcon {...props}>
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </BaseIcon>
+  );
+}

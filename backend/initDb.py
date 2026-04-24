@@ -45,6 +45,12 @@ def apply_startup_migrations():
             # sales_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(sales)")).fetchall()]
             # if "new_column" not in sales_columns:
             #     conn.execute(text("ALTER TABLE sales ADD COLUMN new_column TYPE"))
+
+            # HR Module: ensure tables exist (created by SQLAlchemy, but add any future columns here)
+            _apply_hr_migrations(conn)
+            
+            # Accounting Module: ensure chart of accounts is seeded
+            _seed_chart_of_accounts(conn)
             
             # Migrate default user emails from @inventory.local → @eyerflow.com
             _migrate_default_emails(conn)
@@ -98,3 +104,64 @@ def _migrate_default_emails(conn):
                 logger.info(f"{role.capitalize()} email already updated ({new_email}), skipping")
             else:
                 logger.info(f"{role.capitalize()} default user not found — will be seeded by seed_owner_user()")
+
+
+def _apply_hr_migrations(conn):
+    """Ensure HR tables have all required columns (safe to run on every startup)."""
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+
+    if "employees" in tables:
+        emp_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(employees)")).fetchall()]
+        if "grace_minutes" not in emp_cols:
+            conn.execute(text("ALTER TABLE employees ADD COLUMN grace_minutes INTEGER DEFAULT 10"))
+        if "is_active" not in emp_cols:
+            conn.execute(text("ALTER TABLE employees ADD COLUMN is_active BOOLEAN DEFAULT 1"))
+
+    if "attendance_logs" in tables:
+        att_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(attendance_logs)")).fetchall()]
+        if "late_minutes" not in att_cols:
+            conn.execute(text("ALTER TABLE attendance_logs ADD COLUMN late_minutes INTEGER DEFAULT 0"))
+
+    if "hr_payments" in tables:
+        pay_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(hr_payments)")).fetchall()]
+        if "is_reversed" not in pay_cols:
+            conn.execute(text("ALTER TABLE hr_payments ADD COLUMN is_reversed INTEGER DEFAULT 0"))
+        if "payroll_id" not in pay_cols:
+            conn.execute(text("ALTER TABLE hr_payments ADD COLUMN payroll_id INTEGER"))
+
+    logger.info("HR migrations applied")
+
+
+def _seed_chart_of_accounts(conn):
+    """Ensure default Chart of Accounts exists (safe to run on every startup)."""
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+    
+    if "accounts" not in tables:
+        # Table will be created by SQLAlchemy on startup
+        return
+    
+    # Define default accounts
+    default_accounts = [
+        ("Cash on Hand", "asset"),
+        ("Bank", "asset"),
+        ("Salaries Expense", "expense"),
+        ("Sales Revenue", "revenue"),
+        ("Cost of Goods Sold", "expense"),
+        ("Other Expenses", "expense"),
+        ("Salary Payable", "liability"),
+    ]
+    
+    for name, acc_type in default_accounts:
+        existing = conn.execute(
+            text("SELECT id FROM accounts WHERE name = :name"),
+            {"name": name}
+        ).fetchone()
+        
+        if not existing:
+            conn.execute(
+                text("INSERT INTO accounts (name, type) VALUES (:name, :type)"),
+                {"name": name, "type": acc_type}
+            )
+            logger.info(f"Seeded account: {name} ({acc_type})")
+    
+    logger.info("Chart of Accounts seeded")

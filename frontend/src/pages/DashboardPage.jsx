@@ -92,8 +92,8 @@ function RecentActivity({ sales, expenses }) {
         <p className="py-6 text-center text-sm" style={{ color: "var(--text-secondary)" }}>No recent activity</p>
       ) : (
         <div className="divide-y overflow-y-auto" style={{ borderColor: "var(--border-color)", maxHeight: "364px" }}>
-          {items.map((item) => (
-            <ActivityItem key={item.key} {...item} />
+          {items.map(({ key, ...rest }) => (
+            <ActivityItem key={key} {...rest} />
           ))}
         </div>
       )}

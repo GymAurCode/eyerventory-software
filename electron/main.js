@@ -5,6 +5,27 @@ const http = require("http");
 const { spawn } = require("child_process");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
+// License module — isolated, no impact on updater or inventory backend
+const licenseService = require("./license/licenseService");
+
+/* ---------------- LOAD .env (no dotenv dependency) ---------------- */
+(function loadEnv() {
+  const envPath = path.join(__dirname, "..", ".env");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, "");
+    if (key && !(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+  log.info("[env] .env loaded from:", envPath);
+})();
 
 // Configure electron-log to write to userData/logs/
 log.transports.file.resolvePathFn = () =>
@@ -38,6 +59,7 @@ const isDev = !app.isPackaged;
 
 let mainWindow;
 let backendProcess;
+let licenseBackendProcess;  // License service process (port 8001)
 let backendSpawnError = null; // set if spawn itself fails
 
 /* ---------------- BACKEND READY CHECK ---------------- */
@@ -87,6 +109,43 @@ function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
 
     attempt();
   });
+}
+
+/* ---------------- LICENSE BACKEND START ---------------- */
+function startLicenseBackend() {
+  const licenseDbPath = path.join(app.getPath("userData"), "license.db");
+  const env = { ...process.env, LICENSE_DB_PATH: licenseDbPath };
+
+  let executable, args, options;
+  // license_service/ folder — this is the cwd for both dev and prod
+  const licenseServiceDir = path.join(app.getAppPath(), "license_service");
+
+  if (isDev) {
+    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
+    if (!fs.existsSync(executable)) {
+      log.warn("[license-backend] Python venv not found — license server will not start");
+      return;
+    }
+    // cwd = license_service/ so bare imports (database, models, service) resolve correctly
+    args = ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8001"];
+    options = { env, windowsHide: true, detached: false, cwd: licenseServiceDir };
+  } else {
+    const backendDir = path.join(process.resourcesPath, "backend");
+    executable = path.join(backendDir, "license_service.exe");
+    if (!fs.existsSync(executable)) {
+      log.warn("[license-backend] license_service.exe not found — skipping");
+      return;
+    }
+    args = [];
+    options = { env, windowsHide: true, detached: false, cwd: backendDir };
+  }
+
+  licenseBackendProcess = spawn(executable, args, options);
+  licenseBackendProcess.stdout?.on("data", (d) => log.info("[license:stdout]", d.toString().trim()));
+  licenseBackendProcess.stderr?.on("data", (d) => log.info("[license:stderr]", d.toString().trim()));
+  licenseBackendProcess.on("error", (err) => log.error("[license-backend] spawn error:", err.message));
+  licenseBackendProcess.on("exit", (code) => log.info("[license-backend] exited code:", code));
+  if (licenseBackendProcess.pid) log.info("[license-backend] PID:", licenseBackendProcess.pid);
 }
 
 /* ---------------- BACKEND START ---------------- */
@@ -400,6 +459,7 @@ function setupAutoUpdate() {
 /* ---------------- APP LIFECYCLE ---------------- */
 app.whenReady().then(async () => {
   startBackend();
+  startLicenseBackend();  // Start license service (port 8001)
 
   try {
     await waitForBackend();
@@ -411,11 +471,22 @@ app.whenReady().then(async () => {
       err.message + "\n\nThe application will now close."
     );
     app.quit();
-    return; // <-- critical: don't create window if backend is dead
+    return;
   }
 
+  // ── LICENSE CHECK (runs before window loads) ──────────────────────────────
+  const userDataDir = app.getPath("userData");
+  const licenseStatus = licenseService.loadTokenOnStartup(userDataDir);
+  log.info("[license] startup check:", licenseStatus);
+  // Pass result to renderer via a global so LicenseGate can read it via IPC
+  // (window hasn't loaded yet — we store it and serve via IPC handler below)
+  // ─────────────────────────────────────────────────────────────────────────
+
   createWindow();
-  
+
+  // Start auto backup by default
+  startAutoBackup();
+
   // Only setup auto-updater in production
   if (app.isPackaged) {
     setupAutoUpdate();
@@ -423,18 +494,14 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (backendProcess) {
-    backendProcess.kill();
-    backendProcess = null;
-  }
+  if (backendProcess) { backendProcess.kill(); backendProcess = null; }
+  if (licenseBackendProcess) { licenseBackendProcess.kill(); licenseBackendProcess = null; }
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
-  if (backendProcess) {
-    backendProcess.kill();
-    backendProcess = null;
-  }
+  if (backendProcess) { backendProcess.kill(); backendProcess = null; }
+  if (licenseBackendProcess) { licenseBackendProcess.kill(); licenseBackendProcess = null; }
 });
 
 /* ---------------- IPC ---------------- */
@@ -495,5 +562,70 @@ ipcMain.handle("backup:restore", async () => {
   const dbPath = path.join(app.getPath("userData"), "inventory.db");
   fs.copyFileSync(res.filePaths[0], dbPath);
   log.info("[backup] restored from:", res.filePaths[0]);
+  return { ok: true };
+});
+
+/* ---------------- AUTO BACKUP ---------------- */
+let autoBackupTimer = null;
+const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function runAutoBackup() {
+  try {
+    const dbPath = path.join(app.getPath("userData"), "inventory.db");
+    const backupDir = path.join(app.getPath("userData"), "backup");
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    const dest = path.join(backupDir, "eyerflow_backup.db");
+    fs.copyFileSync(dbPath, dest);
+    log.info("[auto-backup] saved to:", dest);
+  } catch (err) {
+    log.error("[auto-backup] failed:", err.message);
+  }
+}
+
+function startAutoBackup() {
+  if (autoBackupTimer) return;
+  runAutoBackup(); // run immediately on start
+  autoBackupTimer = setInterval(runAutoBackup, AUTO_BACKUP_INTERVAL_MS);
+  log.info("[auto-backup] scheduler started (every 24h)");
+}
+
+function stopAutoBackup() {
+  if (autoBackupTimer) {
+    clearInterval(autoBackupTimer);
+    autoBackupTimer = null;
+    log.info("[auto-backup] scheduler stopped");
+  }
+}
+
+ipcMain.handle("backup:setAuto", (_event, enabled) => {
+  if (enabled) startAutoBackup();
+  else stopAutoBackup();
+  return { ok: true };
+});
+
+/* ---------------- LICENSE IPC ---------------- */
+
+ipcMain.handle("license:check", () => {
+  const userDataDir = app.getPath("userData");
+  const result = licenseService.loadTokenOnStartup(userDataDir);
+  log.info("[license:check]", result);
+  return result;
+});
+
+ipcMain.handle("license:activate", async (_event, licenseKey) => {
+  const userDataDir = app.getPath("userData");
+  const result = await licenseService.activateLicense(userDataDir, licenseKey);
+  log.info("[license:activate]", result.ok ? "success" : result.error);
+  return result;
+});
+
+ipcMain.handle("license:getMachineId", () => {
+  return licenseService.getMachineId();
+});
+
+ipcMain.handle("license:clear", () => {
+  const userDataDir = app.getPath("userData");
+  licenseService.clearToken(userDataDir);
+  log.info("[license:clear] token cleared");
   return { ok: true };
 });

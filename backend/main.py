@@ -10,7 +10,23 @@ from backend.core.security import get_password_hash
 from backend.database import Base, SessionLocal, engine
 from backend.initDb import apply_startup_migrations
 from backend.models import OwnerShare, User
-from backend.routes import auth, expenses, finance, partners, products, reports, sales, settings, users
+from backend.routes import (
+    accounting,
+    attendance,
+    auth,
+    employees,
+    expenses,
+    finance,
+    hr_payments,
+    leaves,
+    partners,
+    payroll,
+    products,
+    reports,
+    sales,
+    settings,
+    users,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("inventory-api")
@@ -83,10 +99,17 @@ app.include_router(products.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
 app.include_router(finance.router, prefix="/api")
+app.include_router(accounting.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(partners.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+# HR Module
+app.include_router(employees.router, prefix="/api")
+app.include_router(attendance.router, prefix="/api")
+app.include_router(leaves.router, prefix="/api")
+app.include_router(payroll.router, prefix="/api")
+app.include_router(hr_payments.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["health"])
