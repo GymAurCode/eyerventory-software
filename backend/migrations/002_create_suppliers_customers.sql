@@ -1,0 +1,20 @@
+-- Suppliers and Customers tables
+CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(30),
+    email VARCHAR(120),
+    address VARCHAR(255),
+    balance REAL NOT NULL DEFAULT 0.0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(30),
+    email VARCHAR(120),
+    address VARCHAR(255),
+    balance REAL NOT NULL DEFAULT 0.0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

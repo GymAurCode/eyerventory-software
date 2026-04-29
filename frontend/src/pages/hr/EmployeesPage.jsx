@@ -106,9 +106,12 @@ export default function EmployeesPage() {
     {
       key: "is_active", label: "Status",
       render: (r) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_active ? "bg-emerald-900/40 text-emerald-400" : "bg-rose-900/40 text-rose-400"}`}>
-          {r.is_active ? "Active" : "Inactive"}
-        </span>
+        <div className="flex items-center gap-2">
+          <div className={`h-2.5 w-2.5 rounded-full ${r.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_active ? "bg-emerald-900/80 text-emerald-100" : "bg-rose-900/80 text-rose-100"}`}>
+            {r.is_active ? "Active" : "Inactive"}
+          </span>
+        </div>
       ),
     },
     {

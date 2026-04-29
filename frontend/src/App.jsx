@@ -11,13 +11,15 @@ import FinancePage from "./pages/FinancePage";
 import LoginPage from "./pages/LoginPage";
 import PartnersPage from "./pages/PartnersPage";
 import ProductsPage from "./pages/ProductsPage";
-import ReportsPage from "./pages/ReportsPage";
 import SalesPage from "./pages/SalesPage";
 import SettingsPage from "./pages/SettingsPage";
-import UsersPage from "./pages/UsersPage";
+import AIIntelligencePage from "./pages/AIIntelligencePage";
 // HR Module pages
-import BackupPage from "./pages/hr/BackupPage";
 import HRManagementPage from "./pages/hr/HRManagementPage";
+import ChartOfAccountsPage from "./pages/ChartOfAccountsPage";
+import PurchasesPage from "./pages/PurchasesPage";
+import CreditManagementPage from "./pages/CreditManagementPage";
+import PaymentsPage from "./pages/PaymentsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { BrandingProvider, useBranding } from "./contexts/BrandingContext";
 import { ShortcutProvider } from "./contexts/ShortcutContext";
@@ -104,43 +106,54 @@ function Layout() {
   return (
     <ShortcutProvider value={shortcutApi}>
       <div className="min-h-screen" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
-      <div className="flex min-h-screen">
-        <AppSidebar collapsed={collapsed} onToggle={() => setCollapsed((s) => !s)} items={sidebarItems} companyName={companyName} />
-        <div className="flex-1">
-          <header className="flex h-16 items-center justify-between border-b px-6" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
-            <div>
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{currentPath}</p>
-              <p className="text-sm font-semibold">{companyName}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase" style={{ border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>{name} ({role})</span>
-              <button className={`btn-soft ${activeActionId === "app.help" ? "ring-2 ring-indigo-500" : ""}`} title={`Help (${formatShortcut("app.help")})`} onClick={() => setShowHelp(true)}>?</button>
-              <button className="btn-soft" onClick={toggleTheme}>{theme === "dark" ? "Light" : "Dark"} Mode</button>
-              <button onClick={logout} className="btn-soft">Logout</button>
-            </div>
-          </header>
-          <main className="p-6">
-            <Suspense fallback={<div className="panel">Loading analytics...</div>}>
-              <Routes>
-                <Route path="/" element={<ProtectedRoute allow={["owner"]}><DashboardPage /></ProtectedRoute>} />
-                <Route path="/products" element={<ProtectedRoute allow={["owner", "staff"]}><ProductsPage /></ProtectedRoute>} />
-                <Route path="/sales" element={<ProtectedRoute allow={["owner", "staff"]}><SalesPage /></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute allow={["owner", "staff"]}><ExpensesPage /></ProtectedRoute>} />
-                <Route path="/finance" element={<ProtectedRoute allow={["owner"]}><FinancePage /></ProtectedRoute>} />
-                <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
-                <Route path="/partners" element={<ProtectedRoute allow={["owner"]}><PartnersPage /></ProtectedRoute>} />
-                <Route path="/users" element={<ProtectedRoute allow={["owner"]}><UsersPage /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute allow={["owner"]}><ReportsPage /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
-                {/* HR Module — single unified page with tabs */}
-                <Route path="/hr" element={<ProtectedRoute allow={["owner", "admin", "hr"]}><HRManagementPage /></ProtectedRoute>} />
-                <Route path="/hr/backup" element={<ProtectedRoute allow={["owner"]}><BackupPage /></ProtectedRoute>} />
-                <Route path="*" element={<Navigate to={role === "staff" ? "/products" : "/"} replace />} />
-              </Routes>
-            </Suspense>
-          </main>
+        <div className="flex">
+          {/* Fixed Sidebar */}
+          <div className="fixed left-0 top-0 h-screen z-10">
+            <AppSidebar collapsed={collapsed} onToggle={() => setCollapsed((s) => !s)} items={sidebarItems} companyName={companyName} />
+          </div>
+          
+          {/* Main Content Area with dynamic margin based on sidebar width */}
+          <div className="flex-1 min-h-screen flex flex-col" style={{ marginLeft: collapsed ? "60px" : "232px", transition: "margin-left 0.3s" }}>
+            <header className="flex h-16 items-center justify-between border-b px-6 shrink-0" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
+              <div>
+                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{currentPath}</p>
+                <p className="text-sm font-semibold">{companyName}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase" style={{ border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>{name} ({role})</span>
+                <button className={`btn-soft ${activeActionId === "app.help" ? "ring-2 ring-indigo-500" : ""}`} title={`Help (${formatShortcut("app.help")})`} onClick={() => setShowHelp(true)}>?</button>
+                <button className="btn-soft" onClick={toggleTheme}>{theme === "dark" ? "Light" : "Dark"} Mode</button>
+                <button onClick={logout} className="btn-soft">Logout</button>
+              </div>
+            </header>
+            <main className="p-6 flex-1 overflow-auto">
+              <Suspense fallback={<div className="panel">Loading analytics...</div>}>
+                <Routes>
+                  <Route path="/" element={<ProtectedRoute allow={["owner"]}><DashboardPage /></ProtectedRoute>} />
+                  <Route path="/products" element={<ProtectedRoute allow={["owner", "staff"]}><ProductsPage /></ProtectedRoute>} />
+                  <Route path="/sales" element={<ProtectedRoute allow={["owner", "staff"]}><SalesPage /></ProtectedRoute>} />
+                  <Route path="/expenses" element={<ProtectedRoute allow={["owner", "staff"]}><ExpensesPage /></ProtectedRoute>} />
+                  <Route path="/finance" element={<ProtectedRoute allow={["owner"]}><FinancePage /></ProtectedRoute>} />
+                  <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
+                  <Route path="/reports" element={<Navigate to="/analytics" replace />} />
+                  <Route path="/ai-intelligence" element={<ProtectedRoute allow={["owner"]}><AIIntelligencePage /></ProtectedRoute>} />
+                  <Route path="/partners" element={<ProtectedRoute allow={["owner"]}><PartnersPage /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
+                  {/* /users and /hr/backup are now tabs inside Settings */}
+                  <Route path="/users" element={<Navigate to="/settings" replace />} />
+                  <Route path="/hr/backup" element={<Navigate to="/settings" replace />} />
+                  {/* HR Module */}
+                  <Route path="/hr" element={<ProtectedRoute allow={["owner", "admin", "hr"]}><HRManagementPage /></ProtectedRoute>} />
+                  <Route path="/accounting/coa" element={<ProtectedRoute allow={["owner"]}><ChartOfAccountsPage /></ProtectedRoute>} />
+                  <Route path="/accounting/purchases" element={<ProtectedRoute allow={["owner"]}><PurchasesPage /></ProtectedRoute>} />
+                  <Route path="/accounting/credit" element={<ProtectedRoute allow={["owner"]}><CreditManagementPage /></ProtectedRoute>} />
+                  <Route path="/accounting/payments" element={<ProtectedRoute allow={["owner"]}><PaymentsPage /></ProtectedRoute>} />
+                  <Route path="*" element={<Navigate to={role === "staff" ? "/products" : "/"} replace />} />
+                </Routes>
+              </Suspense>
+            </main>
+          </div>
         </div>
-      </div>
       </div>
       {showGuide && (
         <div className="fixed bottom-5 right-5 z-40 max-w-sm rounded-xl border p-4 shadow-2xl" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>

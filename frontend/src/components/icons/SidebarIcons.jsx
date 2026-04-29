@@ -218,3 +218,15 @@ export function Database(props) {
     </BaseIcon>
   );
 }
+export function Brain(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-5 0v-15A2.5 2.5 0 0 1 9.5 2Z" />
+      <path d="M12 4.5a2.5 2.5 0 0 1 5 0v15a2.5 2.5 0 0 1-5 0v-15Z" />
+      <path d="M16 8V6a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v2" />
+      <path d="M8 8V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2" />
+      <path d="M16 16v2a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-2" />
+      <path d="M8 16v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2" />
+    </BaseIcon>
+  );
+}

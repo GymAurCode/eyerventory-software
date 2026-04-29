@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -15,6 +15,10 @@ class Sale(Base):
     revenue = Column(Float, nullable=False)
     cost = Column(Float, nullable=False)
     profit = Column(Float, nullable=False)
+    # Credit sale support
+    payment_type = Column(String(10), nullable=False, default="cash")  # cash | credit
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     product = relationship("Product")
+    customer = relationship("Customer", back_populates="sales")

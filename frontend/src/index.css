@@ -11,8 +11,9 @@
     --text-primary: #171717;
     --text-secondary: #52525b;
     --border-color: #e5e7eb;
-    --accent: #282950;
-    --accent-hover: #3a3a63;
+    /* Light theme: mid-range indigo — readable on white, not heavy */
+    --accent: #4f52a3;
+    --accent-hover: #5c5fb8;
     --chart-grid: #d4d4d8;
     --tooltip-bg: #ffffff;
     --tooltip-border: #e4e4e7;
@@ -29,8 +30,9 @@
     --text-primary: #e5e5e5;
     --text-secondary: #a1a1aa;
     --border-color: #1f1f1f;
-    --accent: #282950;
-    --accent-hover: #3a3a63;
+    /* Dark theme: lighter indigo so buttons aren't near-black on dark bg */
+    --accent: #4f52a3;
+    --accent-hover: #5c5fb8;
     --chart-grid: #27272a;
     --tooltip-bg: #101010;
     --tooltip-border: #262626;
@@ -89,10 +91,18 @@
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60;
     background: var(--accent);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
-  .btn-primary:hover {
+  .btn-primary:hover:not(:disabled) {
     background: var(--accent-hover);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
   .btn-soft {
@@ -159,4 +169,19 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
   }
+}
+
+@keyframes bounce-right {
+  0%, 100% { transform: translateX(0); }
+  50%       { transform: translateX(5px); }
+}
+
+@keyframes bounce-up {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+
+@keyframes nudge-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px #6366F133; }
+  50%       { box-shadow: 0 0 0 3px #6366F144; }
 }

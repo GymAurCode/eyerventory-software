@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
@@ -6,8 +7,47 @@ import { useAuth } from "../contexts/AuthContext";
 import { useShortcuts } from "../contexts/ShortcutContext";
 import { formatPKR } from "../utils/currency";
 
+// ── Bulk import nudge tooltip — points at the Import Products button ──────────
+function ImportNudgeTooltip({ onDismiss }) {
+  return (
+    <div
+      className="flex items-start gap-2 rounded-xl border px-4 py-3"
+      style={{
+        borderColor: "#6366F1",
+        background: "color-mix(in srgb, #6366F1 8%, var(--bg-card))",
+        animation: "nudge-pulse 2s ease-in-out 3",
+      }}
+    >
+      {/* Arrow pointing up-right toward the header button */}
+      <span
+        className="mt-0.5 shrink-0 text-lg"
+        style={{ animation: "bounce-up 1s ease-in-out infinite" }}
+      >
+        ☝️
+      </span>
+      <div className="flex-1">
+        <p className="text-sm font-semibold" style={{ color: "#6366F1" }}>
+          Adding multiple products?
+        </p>
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+          Use the <strong>Import Products</strong> button above to add many products at once via Excel.
+        </p>
+      </div>
+      <button
+        className="shrink-0 rounded px-1.5 py-0.5 text-xs transition-opacity hover:opacity-60"
+        style={{ color: "var(--text-secondary)" }}
+        onClick={onDismiss}
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const { role } = useAuth();
+  const navigate = useNavigate();
   const { registerPageAction, activeActionId, formatShortcut } = useShortcuts();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +63,9 @@ export default function ProductsPage() {
   const [stockTarget, setStockTarget] = useState(null);
   const [stockForm, setStockForm] = useState({ quantity: "", price: "" });
   const [form, setForm] = useState({ name: "", cost_price: "", stock: "", image_data: "", image_mime: "" });
+  // Smart nudge: show after first manual add in this session
+  const sessionAdds = useRef(0);
+  const [showNudge, setShowNudge] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +92,9 @@ export default function ProductsPage() {
       } else {
         await api.post("/products", payload);
         toast.success("Product added successfully");
+        // Track manual adds — show nudge after 2nd successful add
+        sessionAdds.current += 1;
+        if (sessionAdds.current >= 2) setShowNudge(true);
       }
       reset();
       setEditingId(0);
@@ -228,18 +274,50 @@ export default function ProductsPage() {
         subtitle="Manage catalog and stock levels"
         actions={
           <>
-            <button className={`btn-soft ${activeActionId === "products.editSelected" ? "ring-2 ring-indigo-500" : ""}`} title={`Edit Selected (${formatShortcut("products.editSelected")})`} onClick={() => selected && openEdit(selected)}>
+            <button
+              className={`btn-soft ${activeActionId === "products.editSelected" ? "ring-2 ring-indigo-500" : ""}`}
+              title={`Edit Selected (${formatShortcut("products.editSelected")})`}
+              onClick={() => selected && openEdit(selected)}
+            >
               Edit Selected ({formatShortcut("products.editSelected")})
             </button>
-            <button className={`btn-primary ${activeActionId === "products.add" ? "ring-2 ring-indigo-500" : ""}`} title={`Add Product (${formatShortcut("products.add")})`} onClick={openCreate}>+ Add Product ({formatShortcut("products.add")})</button>
+
+            {/* Import Products button — always visible, navigates to Bulk Import tab */}
+            <button
+              className="btn-soft relative"
+              style={{
+                borderColor: showNudge ? "#6366F1" : undefined,
+                color: showNudge ? "#6366F1" : undefined,
+                boxShadow: showNudge ? "0 0 0 2px #6366F144" : undefined,
+                animation: showNudge ? "nudge-pulse 2s ease-in-out infinite" : undefined,
+              }}
+              onClick={() => navigate("/analytics", { state: { tab: "Bulk Import" } })}
+              title="Import products from Excel"
+            >
+              ⬆ Import Products
+            </button>
+
+            <button
+              className={`btn-primary ${activeActionId === "products.add" ? "ring-2 ring-indigo-500" : ""}`}
+              title={`Add Product (${formatShortcut("products.add")})`}
+              onClick={openCreate}
+            >
+              + Add Product ({formatShortcut("products.add")})
+            </button>
           </>
         }
       />
+
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard title="Products" value={String(rows.length)} tone="indigo" />
         <StatCard title="Total Stock" value={String(stockTotal)} tone="amber" />
         <StatCard title="Avg Cost" value={avgCost} tone="emerald" money />
       </div>
+
+      {/* Nudge tooltip — appears below stat cards pointing up at the Import button */}
+      {showNudge && (
+        <ImportNudgeTooltip onDismiss={() => setShowNudge(false)} />
+      )}
 
       {loading ? <LoadingSkeleton rows={6} /> : rows.length === 0 ? (
         <EmptyState title="No products yet" description="Create your first product to start inventory tracking." />

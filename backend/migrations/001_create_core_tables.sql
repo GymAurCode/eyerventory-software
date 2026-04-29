@@ -1,0 +1,37 @@
+-- Core tables: users, products
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(120) UNIQUE NOT NULL,
+    name VARCHAR(120),
+    email VARCHAR(120),
+    hashed_password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'staff',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(120) NOT NULL,
+    sku VARCHAR(60) UNIQUE,
+    category VARCHAR(60),
+    cost_price REAL NOT NULL DEFAULT 0.0,
+    selling_price REAL NOT NULL DEFAULT 0.0,
+    stock INTEGER NOT NULL DEFAULT 0,
+    image_data TEXT,
+    image_mime VARCHAR(32),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS owner_shares (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    ownership_percentage REAL NOT NULL DEFAULT 0.0
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key VARCHAR(120) UNIQUE NOT NULL,
+    value TEXT
+);

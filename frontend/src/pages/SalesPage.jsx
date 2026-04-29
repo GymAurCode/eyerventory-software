@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import api from "../api/client";
+import { getCustomers } from "../api/accounting";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
 import { useAuth } from "../contexts/AuthContext";
 import { useShortcuts } from "../contexts/ShortcutContext";
@@ -11,20 +12,22 @@ export default function SalesPage() {
   const { registerPageAction, activeActionId, formatShortcut } = useShortcuts();
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [viewOpen, setViewOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ product_id: "", quantity: "", selling_price: "" });
+  const [form, setForm] = useState({ product_id: "", quantity: "", selling_price: "", payment_type: "cash", customer_id: "" });
   const [error, setError] = useState("");
 
   const load = async () => {
     setLoading(true);
-    const [s, p] = await Promise.all([api.get("/sales"), api.get("/products")]);
+    const [s, p, c] = await Promise.all([api.get("/sales"), api.get("/products"), getCustomers()]);
     setSales(s.data);
     setProducts(p.data);
+    setCustomers(c);
     setLoading(false);
   };
 
@@ -41,9 +44,19 @@ export default function SalesPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    const payload = { product_id: Number(form.product_id), quantity: Number(form.quantity), selling_price: Number(form.selling_price) };
+    const payload = {
+      product_id: Number(form.product_id),
+      quantity: Number(form.quantity),
+      selling_price: Number(form.selling_price),
+      payment_type: form.payment_type,
+      customer_id: form.payment_type === "credit" ? Number(form.customer_id) : null,
+    };
     if (!payload.product_id || payload.quantity <= 0 || payload.selling_price <= 0) {
       setError("Fill all sale fields with valid values.");
+      return;
+    }
+    if (form.payment_type === "credit" && !form.customer_id) {
+      setError("Credit sales require a customer.");
       return;
     }
     if (!selectedProduct) {
@@ -63,7 +76,7 @@ export default function SalesPage() {
     try {
       await api.post("/sales", payload);
       toast.success("Sale created successfully");
-      setForm({ product_id: "", quantity: "", selling_price: "" });
+      setForm({ product_id: "", quantity: "", selling_price: "", payment_type: "cash", customer_id: "" });
       await load();
     } catch (err) {
       const msg = err.response?.data?.detail || "Failed to create sale.";
@@ -132,6 +145,16 @@ export default function SalesPage() {
         </select>
         <input className="input" type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
         <input className="input" type="number" min="0" step="0.01" placeholder="Selling price (PKR)" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} />
+        <select className="input" value={form.payment_type} onChange={(e) => setForm({ ...form, payment_type: e.target.value, customer_id: "" })}>
+          <option value="cash">Cash Sale</option>
+          <option value="credit">Credit Sale</option>
+        </select>
+        {form.payment_type === "credit" && (
+          <select className="input" value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} required>
+            <option value="">Select customer...</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         <button
           id="create-sale-btn"
           className={`btn-primary ${activeActionId === "sales.new" ? "ring-2 ring-indigo-500" : ""}`}
@@ -160,6 +183,11 @@ export default function SalesPage() {
           columns={[
             { key: "product", label: "Product", render: (row) => productNameById[row.product_id] || `#${row.product_id}` },
             { key: "quantity", label: "Qty" },
+            { key: "payment_type", label: "Type", render: (row) => (
+              <span className={`rounded px-2 py-0.5 text-xs font-semibold ${row.payment_type === "credit" ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"}`}>
+                {row.payment_type || "cash"}
+              </span>
+            )},
             ...(role === "owner" ? [{ key: "revenue", label: "Revenue", render: (row) => formatPKR(row.revenue || 0) }, { key: "profit", label: "Profit", render: (row) => formatPKR(row.profit || 0) }] : []),
             {
               key: "actions",

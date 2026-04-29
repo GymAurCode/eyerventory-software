@@ -5,6 +5,9 @@ pydantic>=2.8,<3.0
 pydantic-settings==2.7.1
 passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
+python-multipart==0.0.20
 reportlab
 XlsxWriter
+openpyxl==3.1.5
 email-validator
+rapidfuzz==3.10.1

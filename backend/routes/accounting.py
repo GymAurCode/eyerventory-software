@@ -10,7 +10,6 @@ router = APIRouter(prefix="/accounting", tags=["accounting"])
 
 @router.get("/accounts")
 def get_accounts(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
-    """Get all accounts in the Chart of Accounts."""
     from backend.models.account import Account
     accounts = db.query(Account).all()
     return [
@@ -26,7 +25,6 @@ def get_accounts(db: Session = Depends(get_db), _=Depends(require_roles("owner",
 
 @router.get("/journal-entries")
 def get_journal_entries(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
-    """Get all journal entries."""
     from backend.models.journal import JournalEntry
     entries = db.query(JournalEntry).order_by(JournalEntry.date.desc()).all()
     return [
@@ -49,18 +47,28 @@ def get_journal_entries(db: Session = Depends(get_db), _=Depends(require_roles("
     ]
 
 
+@router.get("/balance-sheet")
+def get_balance_sheet(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
+    """Full balance sheet: assets, liabilities, equity with per-account breakdown."""
+    return accounting_service.get_balance_sheet(db)
+
+
+@router.get("/profit-loss")
+def get_profit_loss(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
+    """Profit & Loss: revenue, expenses, net profit."""
+    return accounting_service.calculate_profit_loss(db)
+
+
 @router.get("/account/{account_name}/balance")
 def get_account_balance(
     account_name: str,
     db: Session = Depends(get_db),
     _=Depends(require_roles("owner", "admin")),
 ):
-    """Get balance for a specific account."""
     from backend.models.account import Account
     account = db.query(Account).filter(Account.name == account_name).first()
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    
     return {
         "account_name": account.name,
         "account_type": account.type,
