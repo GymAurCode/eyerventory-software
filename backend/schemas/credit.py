@@ -1,4 +1,5 @@
 from datetime import datetime
+<<<<<<< HEAD
 
 from pydantic import BaseModel, Field
 
@@ -99,3 +100,64 @@ class CreditSummaryRead(BaseModel):
     payable_by_supplier: list[dict]
     cash_sales_total: float
     credit_sales_total: float
+=======
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+# ── Customer ──────────────────────────────────────────────────────────────────
+
+class CustomerCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+
+class CustomerUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+
+class CustomerRead(BaseModel):
+    id: int
+    name: str
+    phone: Optional[str]
+    email: Optional[str]
+    address: Optional[str]
+    balance: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Supplier ──────────────────────────────────────────────────────────────────
+
+class SupplierCreate(BaseModel):
+    name: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+
+class SupplierRead(BaseModel):
+    id: int
+    name: str
+    phone: Optional[str]
+    email: Optional[str]
+    address: Optional[str]
+    balance: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

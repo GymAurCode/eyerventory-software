@@ -1,15 +1,29 @@
+"""
+initDb.py — backward-compatible shim.
+
+Previously contained inline migration logic. Now delegates to the proper
+migration runner (backend/migrate.py) and seed module (backend/seed.py).
+
+The function name `apply_startup_migrations` is preserved so existing
+imports in main.py continue to work without changes.
+"""
+
 import logging
-from sqlalchemy import text
-from backend.database import engine
+
+from backend.migrate import run_migrations
+from backend.seed import run_seeds
 
 logger = logging.getLogger("inventory-db-init")
 
-def apply_startup_migrations():
+
+def apply_startup_migrations() -> None:
     """
-    Safely applies database migrations on app startup.
-    Checks for missing columns/tables and adds them without breaking existing data.
+    Run all pending SQL migrations then seed default data.
+    Called once at FastAPI startup (see main.py on_startup).
+    Safe to call on a brand-new empty DB or an existing production DB.
     """
     try:
+<<<<<<< HEAD
         with engine.begin() as conn:
             # Users table migrations
             user_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
@@ -404,3 +418,16 @@ def _apply_purchase_migrations(conn):
         logger.info("Created purchase_items table")
 
     logger.info("Purchase migrations applied")
+=======
+        run_migrations()
+    except Exception as exc:
+        logger.error("Migration runner failed: %s", exc)
+        raise
+
+    try:
+        run_seeds()
+    except Exception as exc:
+        # Seed failures are logged but do NOT crash the app —
+        # the app is still usable without default seed data.
+        logger.error("Seed runner failed (non-fatal): %s", exc)
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

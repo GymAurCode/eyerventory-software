@@ -138,7 +138,9 @@ export default function DashboardPage() {
         <div className="xl:col-span-2">
           {role === "owner" && <RecentActivity sales={sales} expenses={expenses} />}
         </div>
-        <QuickActions />
+        <div className="space-y-4">
+          <QuickActions />
+        </div>
       </div>
     </div>
   );

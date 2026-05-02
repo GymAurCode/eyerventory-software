@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import api from "../api/client";
+import { getCustomers } from "../api/accounting";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
 import { useAuth } from "../contexts/AuthContext";
 import { useShortcuts } from "../contexts/ShortcutContext";
@@ -18,6 +19,7 @@ export default function SalesPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [selected, setSelected] = useState(null);
+<<<<<<< HEAD
   const [form, setForm] = useState({
     product_id: "",
     customer_id: "",
@@ -27,14 +29,24 @@ export default function SalesPage() {
     paid_amount: "",
     due_date: "",
   });
+=======
+  const [form, setForm] = useState({ product_id: "", quantity: "", selling_price: "", payment_type: "cash", customer_id: "" });
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
   const [error, setError] = useState("");
 
   const load = async () => {
     setLoading(true);
+<<<<<<< HEAD
     const [s, p, c] = await Promise.all([api.get("/sales"), api.get("/products"), api.get("/customers")]);
     setSales(s.data);
     setProducts(p.data);
     setCustomers(c.data);
+=======
+    const [s, p, c] = await Promise.all([api.get("/sales"), api.get("/products"), getCustomers()]);
+    setSales(s.data);
+    setProducts(p.data);
+    setCustomers(c);
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     setLoading(false);
   };
 
@@ -53,15 +65,26 @@ export default function SalesPage() {
     e.preventDefault();
     const payload = {
       product_id: Number(form.product_id),
+<<<<<<< HEAD
       customer_id: form.customer_id ? Number(form.customer_id) : null,
       quantity: Number(form.quantity),
       selling_price: Number(form.selling_price),
       payment_type: form.payment_type,
       paid_amount: form.paid_amount ? Number(form.paid_amount) : 0,
       due_date: form.due_date || null,
+=======
+      quantity: Number(form.quantity),
+      selling_price: Number(form.selling_price),
+      payment_type: form.payment_type,
+      customer_id: form.payment_type === "credit" ? Number(form.customer_id) : null,
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     };
     if (!payload.product_id || payload.quantity <= 0 || payload.selling_price <= 0) {
       setError("Fill all sale fields with valid values.");
+      return;
+    }
+    if (form.payment_type === "credit" && !form.customer_id) {
+      setError("Credit sales require a customer.");
       return;
     }
     if (!selectedProduct) {
@@ -85,7 +108,11 @@ export default function SalesPage() {
     try {
       await api.post("/sales", payload);
       toast.success("Sale created successfully");
+<<<<<<< HEAD
       setForm({ product_id: "", customer_id: "", quantity: "", selling_price: "", payment_type: "CASH", paid_amount: "", due_date: "" });
+=======
+      setForm({ product_id: "", quantity: "", selling_price: "", payment_type: "cash", customer_id: "" });
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
       await load();
     } catch (err) {
       const msg = err.response?.data?.detail || "Failed to create sale.";
@@ -166,8 +193,21 @@ export default function SalesPage() {
           {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input className="input" type="number" min="0" step="0.01" placeholder="Selling price (PKR)" value={form.selling_price} onChange={(e) => setForm({ ...form, selling_price: e.target.value })} />
+<<<<<<< HEAD
         <input className="input" type="number" min="0" step="0.01" placeholder="Paid amount" value={form.paid_amount} onChange={(e) => setForm({ ...form, paid_amount: e.target.value })} />
         <input className="input" type="datetime-local" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+=======
+        <select className="input" value={form.payment_type} onChange={(e) => setForm({ ...form, payment_type: e.target.value, customer_id: "" })}>
+          <option value="cash">Cash Sale</option>
+          <option value="credit">Credit Sale</option>
+        </select>
+        {form.payment_type === "credit" && (
+          <select className="input" value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} required>
+            <option value="">Select customer...</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
         <button
           id="create-sale-btn"
           className={`btn-primary ${activeActionId === "sales.new" ? "ring-2 ring-indigo-500" : ""}`}
@@ -199,6 +239,11 @@ export default function SalesPage() {
             { key: "paid_amount", label: "Paid", render: (row) => formatPKR(row.paid_amount || 0) },
             { key: "due_amount", label: "Remaining", render: (row) => formatPKR(row.due_amount || 0) },
             { key: "quantity", label: "Qty" },
+            { key: "payment_type", label: "Type", render: (row) => (
+              <span className={`rounded px-2 py-0.5 text-xs font-semibold ${row.payment_type === "credit" ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"}`}>
+                {row.payment_type || "cash"}
+              </span>
+            )},
             ...(role === "owner" ? [{ key: "revenue", label: "Revenue", render: (row) => formatPKR(row.revenue || 0) }, { key: "profit", label: "Profit", render: (row) => formatPKR(row.profit || 0) }] : []),
             {
               key: "actions",

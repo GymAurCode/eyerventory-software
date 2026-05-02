@@ -10,7 +10,21 @@ router = APIRouter(prefix="/accounting", tags=["accounting"])
 
 @router.get("/accounts")
 def get_accounts(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
+<<<<<<< HEAD
     return accounting_service.get_all_account_balances(db)
+=======
+    from backend.models.account import Account
+    accounts = db.query(Account).all()
+    return [
+        {
+            "id": acc.id,
+            "name": acc.name,
+            "type": acc.type,
+            "balance": accounting_service.get_account_balance(db, acc.name),
+        }
+        for acc in accounts
+    ]
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 
 
 @router.get("/journal-entries")
@@ -38,6 +52,7 @@ def get_journal_entries(db: Session = Depends(get_db), _=Depends(require_roles("
     ]
 
 
+<<<<<<< HEAD
 @router.get("/trial-balance")
 def get_trial_balance(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
     rows = accounting_service.get_all_account_balances(db)
@@ -49,10 +64,17 @@ def get_trial_balance(db: Session = Depends(get_db), _=Depends(require_roles("ow
         "total_credit": round(total_cr, 2),
         "balanced":     abs(total_dr - total_cr) < 0.01,
     }
+=======
+@router.get("/balance-sheet")
+def get_balance_sheet(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
+    """Full balance sheet: assets, liabilities, equity with per-account breakdown."""
+    return accounting_service.get_balance_sheet(db)
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 
 
 @router.get("/profit-loss")
 def get_profit_loss(db: Session = Depends(get_db), _=Depends(require_roles("owner", "admin"))):
+<<<<<<< HEAD
     return accounting_service.calculate_profit_loss(db)
 
 
@@ -77,6 +99,12 @@ def get_account_ledger(
     }
 
 
+=======
+    """Profit & Loss: revenue, expenses, net profit."""
+    return accounting_service.calculate_profit_loss(db)
+
+
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 @router.get("/account/{account_name}/balance")
 def get_account_balance(
     account_name: str,

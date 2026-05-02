@@ -1,24 +1,45 @@
 import { memo, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+  Area, AreaChart, CartesianGrid, Cell, Legend,
+  Line, LineChart, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import { toast } from "sonner";
 import api from "../api/client";
+import BulkImportPanel from "../components/BulkImportPanel";
 import { PageHeader } from "../components/UI";
+import { useBranding } from "../contexts/BrandingContext";
 import { useChartTheme } from "../hooks/useChartTheme";
 import { formatPKR } from "../utils/currency";
+import { generatePDF } from "../utils/reportPdf";
 
+// ── Shared tab bar (same style as Settings) ───────────────────────────────────
+function Tabs({ active, onChange }) {
+  return (
+    <div
+      className="flex gap-1 rounded-lg border p-1"
+      style={{ borderColor: "var(--border-color)", background: "var(--bg-elevated)", width: "fit-content" }}
+    >
+      {["Analytics", "Reports", "Bulk Import"].map((tab) => (
+        <button
+          key={tab}
+          onClick={() => onChange(tab)}
+          className="rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-150"
+          style={
+            active === tab
+              ? { background: "var(--bg-card)", color: "var(--text-primary)", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }
+              : { background: "transparent", color: "var(--text-secondary)" }
+          }
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Analytics tab ─────────────────────────────────────────────────────────────
 const CHART_COLORS = ["#6366F1", "#22C55E", "#F59E0B", "#EF4444", "#06B6D4", "#A855F7", "#14B8A6"];
 
 const ChartCard = memo(function ChartCard({ title, children }) {
@@ -36,18 +57,20 @@ function monthKey(dateValue) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function AnalyticsPage() {
+function AnalyticsTab() {
   const [products, setProducts] = useState([]);
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const chartTheme = useChartTheme();
 
   useEffect(() => {
-    Promise.all([api.get("/products"), api.get("/sales"), api.get("/expenses")]).then(([productRes, salesRes, expensesRes]) => {
-      setProducts(productRes.data || []);
-      setSales(salesRes.data || []);
-      setExpenses(expensesRes.data || []);
-    });
+    Promise.all([api.get("/products"), api.get("/sales"), api.get("/expenses")]).then(
+      ([productRes, salesRes, expensesRes]) => {
+        setProducts(productRes.data || []);
+        setSales(salesRes.data || []);
+        setExpenses(expensesRes.data || []);
+      }
+    );
   }, []);
 
   const incomeVsExpensesData = useMemo(() => {
@@ -77,12 +100,8 @@ export default function AnalyticsPage() {
   }, [products]);
 
   const stockLevelsData = useMemo(
-    () =>
-      products
-        .map((item) => ({ name: item.name, stock: Number(item.stock || 0) }))
-        .sort((a, b) => b.stock - a.stock)
-        .slice(0, 12),
-    [products],
+    () => products.map((item) => ({ name: item.name, stock: Number(item.stock || 0) })).sort((a, b) => b.stock - a.stock).slice(0, 12),
+    [products]
   );
 
   const salesTrendData = useMemo(() => {
@@ -106,9 +125,7 @@ export default function AnalyticsPage() {
   }, [expenses]);
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="Analytics" subtitle="Centralized insights for finance, products, sales, and expenses." />
-
+    <div className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Income vs Expenses (Monthly)">
           <ResponsiveContainer width="100%" height="100%">
@@ -116,7 +133,7 @@ export default function AnalyticsPage() {
               <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip contentStyle={chartTheme.tooltipStyle} itemStyle={chartTheme.tooltipItemStyle} labelStyle={chartTheme.tooltipLabelStyle} formatter={(value) => formatPKR(value)} />
+              <Tooltip contentStyle={chartTheme.tooltipStyle} itemStyle={chartTheme.tooltipItemStyle} labelStyle={chartTheme.tooltipLabelStyle} formatter={(v) => formatPKR(v)} />
               <Legend />
               <Line type="monotone" dataKey="income" stroke="#22C55E" strokeWidth={2.2} dot={false} />
               <Line type="monotone" dataKey="expenses" stroke="#EF4444" strokeWidth={2.2} dot={false} />
@@ -148,9 +165,7 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={productDistributionData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={98} paddingAngle={2}>
-                {productDistributionData.map((entry, idx) => (
-                  <Cell key={entry.name} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                ))}
+                {productDistributionData.map((entry, idx) => <Cell key={entry.name} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={chartTheme.tooltipStyle} itemStyle={chartTheme.tooltipItemStyle} labelStyle={chartTheme.tooltipLabelStyle} />
               <Legend />
@@ -180,16 +195,77 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={expensesBreakdownData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={96} paddingAngle={2}>
-                {expensesBreakdownData.map((entry, idx) => (
-                  <Cell key={entry.name} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                ))}
+                {expensesBreakdownData.map((entry, idx) => <Cell key={entry.name} fill={CHART_COLORS[idx % CHART_COLORS.length]} />)}
               </Pie>
-              <Tooltip contentStyle={chartTheme.tooltipStyle} itemStyle={chartTheme.tooltipItemStyle} labelStyle={chartTheme.tooltipLabelStyle} formatter={(value) => formatPKR(value)} />
+              <Tooltip contentStyle={chartTheme.tooltipStyle} itemStyle={chartTheme.tooltipItemStyle} labelStyle={chartTheme.tooltipLabelStyle} formatter={(v) => formatPKR(v)} />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
+    </div>
+  );
+}
+
+// ── Reports tab ───────────────────────────────────────────────────────────────
+const REPORT_TYPES = [
+  { id: "products",       label: "Products Report" },
+  { id: "sales",          label: "Sales Report" },
+  { id: "expenses",       label: "Expenses Report" },
+  { id: "finance",        label: "Finance Report" },
+  { id: "partner_profit", label: "Partner Profit Report" },
+];
+
+async function downloadReport(reportType, fmt, companyName) {
+  try {
+    if (fmt === "pdf") {
+      const { data } = await api.get(`/reports/data?report_type=${reportType}`);
+      await generatePDF({ title: data?.title || "Report", columns: data?.columns || [], data: data?.data || [], companyName });
+      toast.success("PDF generated successfully");
+      return;
+    }
+    const res = await api.get(`/reports/export?report_type=${reportType}&fmt=${fmt}`, { responseType: "blob" });
+    const blob = new Blob([res.data]);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reportType}.${fmt === "excel" ? "xlsx" : "pdf"}`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    toast.error(err.response?.data?.detail || "Failed to export report");
+  }
+}
+
+function ReportsTab() {
+  const { companyName } = useBranding();
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {REPORT_TYPES.map((item) => (
+        <div key={item.id} className="panel flex items-center justify-between">
+          <p className="font-medium">{item.label}</p>
+          <div className="space-x-2">
+            <button className="btn-soft" onClick={() => downloadReport(item.id, "pdf", companyName)}>PDF</button>
+            <button className="btn-soft" onClick={() => downloadReport(item.id, "excel", companyName)}>Excel</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+export default function AnalyticsPage() {
+  const { state } = useLocation();
+  const [activeTab, setActiveTab] = useState(state?.tab || "Analytics");
+
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Analytics & Reports" subtitle="Insights, charts, exportable reports, and bulk product import." />
+      <Tabs active={activeTab} onChange={setActiveTab} />
+      {activeTab === "Analytics"    && <AnalyticsTab />}
+      {activeTab === "Reports"      && <ReportsTab />}
+      {activeTab === "Bulk Import"  && <BulkImportPanel />}
     </div>
   );
 }

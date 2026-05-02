@@ -108,9 +108,18 @@ export default function EmployeesPage() {
     {
       key: "is_active", label: "Status",
       render: (r) => (
+<<<<<<< HEAD
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"}`}>
           {r.is_active ? "Active" : "Inactive"}
         </span>
+=======
+        <div className="flex items-center gap-2">
+          <div className={`h-2.5 w-2.5 rounded-full ${r.is_active ? "bg-emerald-500" : "bg-rose-500"}`} />
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_active ? "bg-emerald-900/80 text-emerald-100" : "bg-rose-900/80 text-rose-100"}`}>
+            {r.is_active ? "Active" : "Inactive"}
+          </span>
+        </div>
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
       ),
     },
     {
