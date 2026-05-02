@@ -1,11 +1,11 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const http = require("http");
-const net = require("net");
-const { spawn } = require("child_process");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
+// Backend managers for robust startup
+const BackendManager = require("./backend-manager");
+const LicenseBackendManager = require("./license-backend-manager");
 // License module — isolated, no impact on updater or inventory backend
 const licenseService = require("./license/licenseService");
 
@@ -59,249 +59,9 @@ const isDev = !app.isPackaged;
 })();
 
 let mainWindow;
-let backendProcess = null;
-let licenseBackendProcess;  // License service process (port 8001)
-let backendSpawnError = null; // set if spawn itself fails
-const BACKEND_HOST = "127.0.0.1";
-const BACKEND_PORT = "8000";
-
-/* ---------------- BACKEND READY CHECK ---------------- */
-/**
- * Polls /api/health until the backend responds or we time out.
- * Rejects immediately if the spawn already errored.
- */
-function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + maxWaitMs;
-
-    function attempt() {
-      // If spawn already failed, no point polling
-      if (backendSpawnError) {
-        return reject(backendSpawnError);
-      }
-
-      const req = http.get(`http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`, (res) => {
-        if (res.statusCode < 500) {
-          log.info("[backend] health check passed");
-          resolve();
-        } else {
-          retry();
-        }
-        // Drain the response so the socket closes
-        res.resume();
-      });
-
-      req.on("error", retry);
-      req.setTimeout(500, () => {
-        req.destroy();
-        retry();
-      });
-    }
-
-    function retry() {
-      if (Date.now() >= deadline) {
-        return reject(
-          new Error(
-            "Backend did not start within 90 seconds.\n\n" +
-            "Check logs at: " + path.join(app.getPath("userData"), "logs", "main.log")
-          )
-        );
-      }
-      setTimeout(attempt, intervalMs);
-    }
-
-    attempt();
-  });
-}
-
-function isPortInUse(port, host = BACKEND_HOST) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        resolve(true);
-      } else {
-        log.warn(`[backend] port check error on ${host}:${port}:`, err.message);
-        resolve(false);
-      }
-    });
-    server.once("listening", () => {
-      server.close(() => resolve(false));
-    });
-    server.listen(port, host);
-  });
-}
-
-/* ---------------- LICENSE BACKEND START ---------------- */
-function startLicenseBackend() {
-  const licenseDbPath = path.join(app.getPath("userData"), "license.db");
-  const env = { ...process.env, LICENSE_DB_PATH: licenseDbPath };
-
-  let executable, args, options;
-  // license_service/ folder — this is the cwd for both dev and prod
-  const licenseServiceDir = path.join(app.getAppPath(), "license_service");
-
-  if (isDev) {
-    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
-    if (!fs.existsSync(executable)) {
-      log.warn("[license-backend] Python venv not found — license server will not start");
-      return;
-    }
-    // cwd = license_service/ so bare imports (database, models, service) resolve correctly
-    args = ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8001"];
-    options = { env, windowsHide: true, detached: false, cwd: licenseServiceDir };
-  } else {
-    const backendDir = path.join(process.resourcesPath, "backend");
-    executable = path.join(backendDir, "license_service.exe");
-    if (!fs.existsSync(executable)) {
-      log.warn("[license-backend] license_service.exe not found — skipping");
-      return;
-    }
-    args = [];
-    options = { env, windowsHide: true, detached: false, cwd: backendDir };
-  }
-
-  licenseBackendProcess = spawn(executable, args, options);
-  licenseBackendProcess.stdout?.on("data", (d) => log.info("[license:stdout]", d.toString().trim()));
-  licenseBackendProcess.stderr?.on("data", (d) => log.info("[license:stderr]", d.toString().trim()));
-  licenseBackendProcess.on("error", (err) => log.error("[license-backend] spawn error:", err.message));
-  licenseBackendProcess.on("exit", (code) => log.info("[license-backend] exited code:", code));
-  if (licenseBackendProcess.pid) log.info("[license-backend] PID:", licenseBackendProcess.pid);
-}
-
-/* ---------------- BACKEND START ---------------- */
-async function startBackend() {
-  if (backendProcess) {
-    log.warn("[backend] already running, skipping duplicate start");
-    return;
-  }
-
-  const portInUse = await isPortInUse(Number(BACKEND_PORT), BACKEND_HOST);
-  if (portInUse) {
-    log.warn(`[backend] port ${BACKEND_HOST}:${BACKEND_PORT} already in use, skipping backend spawn`);
-    return;
-  }
-
-  const dbPath = path.join(app.getPath("userData"), "inventory.db");
-
-  // Ensure userData dir exists (it always should, but be safe)
-  const userDataDir = app.getPath("userData");
-  if (!fs.existsSync(userDataDir)) {
-    fs.mkdirSync(userDataDir, { recursive: true });
-  }
-
-  log.info("[backend] DB_PATH =", dbPath);
-  log.info("[backend] Environment: " + (isDev ? "DEVELOPMENT" : "PRODUCTION (app.isPackaged=true)"));
-
-  const env = {
-    ...process.env,
-    DB_PATH: dbPath,
-    BACKEND_PORT,
-  };
-
-  let executable, args, options, backendDir;
-
-  if (app.isPackaged) {
-    // Production: backend.exe in resources/backend folder (via extraResources)
-    backendDir = path.join(process.resourcesPath, "backend");
-    executable = path.join(backendDir, "backend.exe");
-
-    log.info("[backend] mode=production (backend.exe)");
-    log.info("[backend] process.resourcesPath:", process.resourcesPath);
-    log.info("[backend] backendDir:", backendDir);
-    log.info("[backend] expectedExecutable:", executable);
-
-    if (!fs.existsSync(backendDir)) {
-      const msg = `Backend resources folder not found at:\n${backendDir}\n\nThe app was not packaged correctly.`;
-      log.error("[backend]", msg);
-      log.error("[backend] process.resourcesPath:", process.resourcesPath);
-      log.error("[backend] Contents of process.resourcesPath:", fs.readdirSync(process.resourcesPath).join(", "));
-      dialog.showErrorBox("Backend Resources Missing", msg);
-      app.quit();
-      return;
-    }
-
-    if (!fs.existsSync(executable)) {
-      const msg = `backend.exe not found at:\n${executable}\n\nThe app may not have been built correctly.`;
-      log.error("[backend]", msg);
-      log.error("[backend] Contents of backendDir:", fs.readdirSync(backendDir).join(", "));
-      dialog.showErrorBox("Backend Executable Missing", msg);
-      app.quit();
-      return;
-    }
-
-    args = [];
-    options = {
-      env,
-      windowsHide: true,
-      detached: false,
-      cwd: backendDir
-    };
-  } else {
-    // Development: using Python + uvicorn for live reload during development
-    executable = path.join(app.getAppPath(), "venv", "Scripts", "python.exe");
-
-    if (!fs.existsSync(executable)) {
-      const msg = `Python executable not found at:\n${executable}\n\nEnsure the venv is set up correctly.\n\nRun: python -m venv venv && .\\venv\\Scripts\\activate && pip install -r requirements.txt`;
-      log.error("[backend]", msg);
-      dialog.showErrorBox("Python venv Not Found", msg);
-      app.quit();
-      return;
-    }
-
-    args = [
-      "-m", "uvicorn", "backend.main:app",
-      "--host", BACKEND_HOST,
-      "--port", BACKEND_PORT,
-      "--reload",
-    ];
-    options = { 
-      env, 
-      windowsHide: true, 
-      detached: false,
-      cwd: app.getAppPath()
-    };
-  }
-
-  // Verify executable file is readable
-  try {
-    fs.accessSync(executable, fs.constants.X_OK);
-    log.info("[backend] executable is readable and executable");
-  } catch (err) {
-    log.warn("[backend] executable may not be executable:", err.message);
-  }
-
-  log.info(`[backend] isDev=${isDev}`);
-  log.info(`[backend] spawning: ${executable}`);
-  log.info(`[backend] args: ${JSON.stringify(args)}`);
-  log.info(`[backend] cwd: ${options.cwd}`);
-
-  backendProcess = spawn(executable, args, options);
-
-  backendProcess.stdout.on("data", (d) =>
-    log.info("[backend:stdout]", d.toString().trim())
-  );
-  backendProcess.stderr.on("data", (d) =>
-    log.info("[backend:stderr]", d.toString().trim())
-  );
-
-  backendProcess.on("error", (err) => {
-    log.error("[backend] spawn error:", err);
-    backendSpawnError = new Error(
-      `Failed to start backend process.\n\n${err.message}\n\nExecutable: ${executable}\nArgs: ${JSON.stringify(args)}`
-    );
-  });
-
-  backendProcess.on("exit", (code, signal) => {
-    log.warn(`[backend] exited — code=${code} signal=${signal}`);
-    backendProcess = null;
-  });
-
-  // Log PID for debugging
-  if (backendProcess.pid) {
-    log.info(`[backend] started with PID: ${backendProcess.pid}`);
-  }
-}
+let backendManager;
+let licenseBackendManager;
+const isDev = !app.isPackaged;
 
 /* ---------------- WINDOW ---------------- */
 function createWindow() {
@@ -502,12 +262,14 @@ app.commandLine.appendSwitch("enable-speech-input");
 app.commandLine.appendSwitch("allow-http-background-page");
 
 app.whenReady().then(async () => {
-  await startBackend();
-  startLicenseBackend();  // Start license service (port 8001)
+  // Initialize backend managers
+  backendManager = new BackendManager(app);
+  licenseBackendManager = new LicenseBackendManager(app);
 
+  // Start main backend with retry logic
   try {
-    await waitForBackend();
-    log.info("[app] backend ready — creating window");
+    const backendInfo = await backendManager.start();
+    log.info(`[app] backend ready at ${backendInfo.host}:${backendInfo.port}`);
   } catch (err) {
     log.error("[app] backend failed to start:", err.message);
     dialog.showErrorBox(
@@ -516,6 +278,14 @@ app.whenReady().then(async () => {
     );
     app.quit();
     return;
+  }
+
+  // Start license backend (non-blocking)
+  const licenseResult = licenseBackendManager.start();
+  if (licenseResult.success) {
+    log.info(`[app] license service started on port ${licenseResult.port}`);
+  } else {
+    log.warn(`[app] license service failed to start: ${licenseResult.reason}`);
   }
 
   // ── LICENSE CHECK (runs before window loads) ──────────────────────────────
@@ -538,18 +308,34 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  if (backendProcess) { backendProcess.kill(); backendProcess = null; }
-  if (licenseBackendProcess) { licenseBackendProcess.kill(); licenseBackendProcess = null; }
+  if (backendManager) backendManager.stop();
+  if (licenseBackendManager) licenseBackendManager.stop();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
-  if (backendProcess) { backendProcess.kill(); backendProcess = null; }
-  if (licenseBackendProcess) { licenseBackendProcess.kill(); licenseBackendProcess = null; }
+  if (backendManager) backendManager.stop();
+  if (licenseBackendManager) licenseBackendManager.stop();
 });
 
 /* ---------------- IPC ---------------- */
 ipcMain.handle("app:getVersion", () => app.getVersion());
+
+// Get backend connection info
+ipcMain.handle("backend:getInfo", () => {
+  if (!backendManager) {
+    return { error: "Backend manager not initialized" };
+  }
+  return backendManager.getInfo();
+});
+
+// Get license backend info
+ipcMain.handle("license-backend:getInfo", () => {
+  if (!licenseBackendManager) {
+    return { error: "License backend manager not initialized" };
+  }
+  return licenseBackendManager.getInfo();
+});
 
 // Manual update check (for testing or user-triggered checks)
 ipcMain.handle("app:checkForUpdates", async () => {

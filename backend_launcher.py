@@ -32,10 +32,14 @@ def main():
     from backend.database import DB_PATH
     logger.info(f"[launcher] resolved DB_PATH = {DB_PATH}")
 
+    # Get port from environment variable (set by Electron), default to 8000
+    port = int(os.getenv("BACKEND_PORT", "8000"))
+    logger.info(f"[launcher] starting on port {port}")
+
     uvicorn.run(
         app,
         host="127.0.0.1",
-        port=8000,
+        port=port,
         log_level="info",
     )
 

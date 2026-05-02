@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("desktop", {
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
   backupDatabase: () => ipcRenderer.invoke("backup:create"),
   restoreDatabase: () => ipcRenderer.invoke("backup:restore"),
+  getBackendInfo: () => ipcRenderer.invoke("backend:getInfo"),
+  getLicenseBackendInfo: () => ipcRenderer.invoke("license-backend:getInfo"),
 });
 
 // HR Module API — exposed as window.electronAPI
