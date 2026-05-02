@@ -1,6 +1,14 @@
 """
-Accounting Service: Handles journal entries and account management for proper financial recording.
-Implements double-entry bookkeeping principles to ensure financial accuracy.
+Double-Entry Accounting Engine
+================================
+Every financial event creates balanced journal entries (DR = CR).
+
+Account normal balances:
+  ASSET    → debit  (balance = debits - credits)
+  EXPENSE  → debit  (balance = debits - credits)
+  LIABILITY→ credit (balance = credits - debits)
+  EQUITY   → credit (balance = credits - debits)
+  REVENUE  → credit (balance = credits - debits)
 """
 from datetime import datetime
 from typing import Optional
@@ -11,53 +19,76 @@ from sqlalchemy.orm import Session
 from backend.models.account import Account
 from backend.models.journal import JournalEntry, JournalItem
 
+# ---------------------------------------------------------------------------
+# Default Chart of Accounts (code → name, type)
+# ---------------------------------------------------------------------------
+DEFAULT_ACCOUNTS = [
+    ("1001", "Cash on Hand",          "asset"),
+    ("1002", "Bank",                  "asset"),
+    ("1100", "Accounts Receivable",   "asset"),
+    ("1200", "Inventory",             "asset"),
+    ("2001", "Accounts Payable",      "liability"),
+    ("2100", "Salary Payable",        "liability"),
+    ("4001", "Sales Revenue",         "revenue"),
+    ("5001", "Cost of Goods Sold",    "expense"),
+    ("5002", "Salaries Expense",      "expense"),
+    ("5003", "Operational Expenses",  "expense"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Account helpers
+# ---------------------------------------------------------------------------
 
 def get_or_create_account(db: Session, name: str, acc_type: str) -> Account:
-    """Get existing account or create if not found."""
     account = db.query(Account).filter(Account.name == name).first()
     if not account:
         account = Account(name=name, type=acc_type)
         db.add(account)
-        db.commit()
-        db.refresh(account)
+        db.flush()
     return account
 
+
+def get_account_by_name(db: Session, name: str) -> Optional[Account]:
+    return db.query(Account).filter(Account.name == name).first()
+
+
+def seed_default_accounts(db: Session) -> None:
+    """Idempotently insert default COA rows."""
+    for code, name, acc_type in DEFAULT_ACCOUNTS:
+        existing = db.query(Account).filter(Account.name == name).first()
+        if not existing:
+            db.add(Account(code=code, name=name, type=acc_type))
+        elif existing.code is None:
+            existing.code = code
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Core journal entry creator
+# ---------------------------------------------------------------------------
 
 def create_journal_entry(
     db: Session,
     description: str,
-    entries: list[dict],  # [{"account_name": "...", "account_type": "...", "debit": 0, "credit": 0}]
+    entries: list[dict],
     reference_type: Optional[str] = None,
     reference_id: Optional[int] = None,
 ) -> JournalEntry:
     """
-    Create a journal entry with multiple items (double-entry bookkeeping).
-    
-    Validates that debits = credits.
-    
-    Args:
-        db: Database session
-        description: Description of the journal entry (e.g., "Salary Payment for 2025-01")
-        entries: List of dicts with account_name, account_type, debit, credit
-        reference_type: Type of reference (e.g., "payroll", "expense")
-        reference_id: ID of the reference (e.g., payroll_id)
-    
-    Returns:
-        JournalEntry object
-    
-    Raises:
-        ValueError: If debits don't equal credits
+    Create a balanced journal entry.
+
+    Each entry dict: {"account_name": str, "account_type": str, "debit": float, "credit": float}
+    Raises ValueError if debits ≠ credits.
     """
-    # Validate double-entry bookkeeping
-    total_debit = sum(e.get("debit", 0) for e in entries)
-    total_credit = sum(e.get("credit", 0) for e in entries)
-    
-    if abs(total_debit - total_credit) > 0.01:  # Allow small floating point differences
+    total_debit  = sum(float(e.get("debit",  0)) for e in entries)
+    total_credit = sum(float(e.get("credit", 0)) for e in entries)
+
+    if abs(total_debit - total_credit) > 0.01:
         raise ValueError(
-            f"Journal entry not balanced: Debits ({total_debit}) != Credits ({total_credit})"
+            f"Unbalanced journal entry: DR {total_debit:.2f} ≠ CR {total_credit:.2f}"
         )
-    
-    # Create journal entry
+
     journal = JournalEntry(
         date=datetime.utcnow(),
         description=description,
@@ -65,27 +96,134 @@ def create_journal_entry(
         reference_id=reference_id,
     )
     db.add(journal)
-    db.flush()  # Ensure journal has an ID
-    
-    # Create journal items (account entries)
-    for entry in entries:
-        account = get_or_create_account(
-            db,
-            entry["account_name"],
-            entry["account_type"]
-        )
-        
-        item = JournalItem(
+    db.flush()
+
+    for e in entries:
+        account = get_or_create_account(db, e["account_name"], e["account_type"])
+        db.add(JournalItem(
             journal_id=journal.id,
             account_id=account.id,
-            debit=entry.get("debit", 0.0),
-            credit=entry.get("credit", 0.0),
-        )
-        db.add(item)
-    
-    db.commit()
-    db.refresh(journal)
+            debit=float(e.get("debit", 0.0)),
+            credit=float(e.get("credit", 0.0)),
+        ))
+
+    db.flush()
     return journal
+
+
+# ---------------------------------------------------------------------------
+# Business-event journal recorders
+# ---------------------------------------------------------------------------
+
+def record_sale(
+    db: Session,
+    sale_id: int,
+    revenue: float,
+    cost: float,
+    paid_amount: float,
+    payment_type: str,
+    product_name: str = "",
+) -> JournalEntry:
+    """
+    CASH sale:
+        DR Cash on Hand       revenue
+        CR Sales Revenue      revenue
+        DR Cost of Goods Sold cost
+        CR Inventory          cost
+
+    CREDIT sale:
+        DR Accounts Receivable  revenue
+        CR Sales Revenue        revenue
+        DR Cost of Goods Sold   cost
+        CR Inventory            cost
+
+    Partial cash on credit:
+        DR Cash on Hand         paid_amount
+        DR Accounts Receivable  (revenue - paid_amount)
+        CR Sales Revenue        revenue
+        DR COGS                 cost
+        CR Inventory            cost
+    """
+    due = revenue - paid_amount
+    entries = []
+
+    # Revenue side
+    if payment_type == "CASH":
+        entries.append({"account_name": "Cash on Hand", "account_type": "asset",
+                        "debit": revenue, "credit": 0.0})
+    else:
+        if paid_amount > 0:
+            entries.append({"account_name": "Cash on Hand", "account_type": "asset",
+                            "debit": paid_amount, "credit": 0.0})
+        if due > 0:
+            entries.append({"account_name": "Accounts Receivable", "account_type": "asset",
+                            "debit": due, "credit": 0.0})
+
+    entries.append({"account_name": "Sales Revenue", "account_type": "revenue",
+                    "debit": 0.0, "credit": revenue})
+
+    # COGS side
+    entries.append({"account_name": "Cost of Goods Sold", "account_type": "expense",
+                    "debit": cost, "credit": 0.0})
+    entries.append({"account_name": "Inventory", "account_type": "asset",
+                    "debit": 0.0, "credit": cost})
+
+    return create_journal_entry(
+        db,
+        f"Sale #{sale_id}" + (f" — {product_name}" if product_name else ""),
+        entries,
+        reference_type="sale",
+        reference_id=sale_id,
+    )
+
+
+def record_customer_payment(
+    db: Session,
+    sale_id: int,
+    amount: float,
+) -> JournalEntry:
+    """
+    Customer payment received:
+        DR Cash on Hand          amount
+        CR Accounts Receivable   amount
+    """
+    return create_journal_entry(
+        db,
+        f"Customer payment for Sale #{sale_id}",
+        [
+            {"account_name": "Cash on Hand", "account_type": "asset",
+             "debit": amount, "credit": 0.0},
+            {"account_name": "Accounts Receivable", "account_type": "asset",
+             "debit": 0.0, "credit": amount},
+        ],
+        reference_type="customer_payment",
+        reference_id=sale_id,
+    )
+
+
+def record_expense(
+    db: Session,
+    expense_id: int,
+    amount: float,
+    category: str = "",
+) -> JournalEntry:
+    """
+    Operational expense:
+        DR Operational Expenses   amount
+        CR Cash on Hand           amount
+    """
+    return create_journal_entry(
+        db,
+        f"Expense — {category}" if category else f"Expense #{expense_id}",
+        [
+            {"account_name": "Operational Expenses", "account_type": "expense",
+             "debit": amount, "credit": 0.0},
+            {"account_name": "Cash on Hand", "account_type": "asset",
+             "debit": 0.0, "credit": amount},
+        ],
+        reference_type="expense",
+        reference_id=expense_id,
+    )
 
 
 def record_payroll_payment(
@@ -96,66 +234,23 @@ def record_payroll_payment(
     net_salary: float,
     use_accrual: bool = False,
 ) -> JournalEntry:
-    """
-    Record a payroll payment in the journal.
-    
-    Simple Approach (Cash Basis):
-        DR Salaries Expense → net_salary
-        CR Cash/Bank → net_salary
-    
-    Accrual Approach:
-        DR Salary Payable → net_salary
-        CR Cash/Bank → net_salary
-    
-    Args:
-        db: Database session
-        payroll_id: ID of the payroll record
-        employee_name: Name of the employee (for description)
-        month: Month in YYYY-MM format
-        net_salary: Net salary to be paid
-        use_accrual: If True, use accrual method; else cash method
-    
-    Returns:
-        JournalEntry object
-    """
-    description = f"Salary Payment for {employee_name} - {month}"
-    
     if use_accrual:
-        # Accrual: reduce liability, reduce cash
         entries = [
-            {
-                "account_name": "Salary Payable",
-                "account_type": "liability",
-                "debit": net_salary,
-                "credit": 0.0,
-            },
-            {
-                "account_name": "Bank",
-                "account_type": "asset",
-                "debit": 0.0,
-                "credit": net_salary,
-            },
+            {"account_name": "Salary Payable",   "account_type": "liability",
+             "debit": net_salary, "credit": 0.0},
+            {"account_name": "Cash on Hand",      "account_type": "asset",
+             "debit": 0.0, "credit": net_salary},
         ]
     else:
-        # Cash basis: expense immediately, reduce cash
         entries = [
-            {
-                "account_name": "Salaries Expense",
-                "account_type": "expense",
-                "debit": net_salary,
-                "credit": 0.0,
-            },
-            {
-                "account_name": "Bank",
-                "account_type": "asset",
-                "debit": 0.0,
-                "credit": net_salary,
-            },
+            {"account_name": "Salaries Expense", "account_type": "expense",
+             "debit": net_salary, "credit": 0.0},
+            {"account_name": "Cash on Hand",     "account_type": "asset",
+             "debit": 0.0, "credit": net_salary},
         ]
-    
     return create_journal_entry(
         db,
-        description,
+        f"Salary Payment — {employee_name} ({month})",
         entries,
         reference_type="payroll",
         reference_id=payroll_id,
@@ -169,164 +264,123 @@ def record_payroll_accrual(
     month: str,
     net_salary: float,
 ) -> JournalEntry:
-    """
-    Record a payroll accrual when payroll is generated (not yet paid).
-    
-    Used for accrual accounting:
-        DR Salaries Expense → net_salary
-        CR Salary Payable → net_salary
-    
-    Args:
-        db: Database session
-        payroll_id: ID of the payroll record
-        employee_name: Name of the employee
-        month: Month in YYYY-MM format
-        net_salary: Net salary amount
-    
-    Returns:
-        JournalEntry object
-    """
-    description = f"Salary Accrual for {employee_name} - {month}"
-    
-    entries = [
-        {
-            "account_name": "Salaries Expense",
-            "account_type": "expense",
-            "debit": net_salary,
-            "credit": 0.0,
-        },
-        {
-            "account_name": "Salary Payable",
-            "account_type": "liability",
-            "debit": 0.0,
-            "credit": net_salary,
-        },
-    ]
-    
     return create_journal_entry(
         db,
-        description,
-        entries,
+        f"Salary Accrual — {employee_name} ({month})",
+        [
+            {"account_name": "Salaries Expense", "account_type": "expense",
+             "debit": net_salary, "credit": 0.0},
+            {"account_name": "Salary Payable",   "account_type": "liability",
+             "debit": 0.0, "credit": net_salary},
+        ],
         reference_type="payroll_accrual",
         reference_id=payroll_id,
     )
 
 
+# ---------------------------------------------------------------------------
+# Balance / reporting helpers
+# ---------------------------------------------------------------------------
+
 def get_account_balance(db: Session, account_name: str) -> float:
-    """
-    Get the balance of an account (Debits - Credits for assets/expenses, Credits - Debits for liabilities/equity/revenue).
-    
-    Accounting Rule:
-    - Assets/Expenses: Balance = Sum(Debits) - Sum(Credits)
-    - Liabilities/Equity/Revenue: Balance = Sum(Credits) - Sum(Debits)
-    
-    Args:
-        db: Database session
-        account_name: Name of the account
-    
-    Returns:
-        Account balance as float
-    """
     account = db.query(Account).filter(Account.name == account_name).first()
     if not account:
         return 0.0
-    
-    result = db.query(
-        func.coalesce(func.sum(JournalItem.debit), 0.0),
+    dr, cr = db.query(
+        func.coalesce(func.sum(JournalItem.debit),  0.0),
         func.coalesce(func.sum(JournalItem.credit), 0.0),
     ).filter(JournalItem.account_id == account.id).one()
-    
-    total_debit, total_credit = result
-    
-    # Calculate balance based on account type
     if account.type in ("asset", "expense"):
-        return float(total_debit - total_credit)
-    else:  # liability, equity, revenue
-        return float(total_credit - total_debit)
+        return float(dr - cr)
+    return float(cr - dr)
 
 
 def get_account_balances_by_type(db: Session, acc_type: str) -> dict[str, float]:
-    """
-    Get all account balances for a specific account type.
-    
-    Args:
-        db: Database session
-        acc_type: Account type (asset, liability, equity, revenue, expense)
-    
-    Returns:
-        Dictionary mapping account names to balances
-    """
     accounts = db.query(Account).filter(Account.type == acc_type).all()
     return {acc.name: get_account_balance(db, acc.name) for acc in accounts}
 
 
+def get_all_account_balances(db: Session) -> list[dict]:
+    """Return every account with its current balance — used for Trial Balance."""
+    accounts = db.query(Account).order_by(Account.type, Account.name).all()
+    result = []
+    for acc in accounts:
+        dr, cr = db.query(
+            func.coalesce(func.sum(JournalItem.debit),  0.0),
+            func.coalesce(func.sum(JournalItem.credit), 0.0),
+        ).filter(JournalItem.account_id == acc.id).one()
+        result.append({
+            "id":      acc.id,
+            "code":    acc.code or "",
+            "name":    acc.name,
+            "type":    acc.type,
+            "total_debit":  float(dr),
+            "total_credit": float(cr),
+            "balance": float(dr - cr) if acc.type in ("asset", "expense") else float(cr - dr),
+        })
+    return result
+
+
 def calculate_profit_loss(db: Session) -> dict:
-    """
-    Calculate Profit & Loss using journal entries.
-    
-    Formula:
-        Total Revenue = Sum of Credits in Revenue accounts
-        Total Expenses = Sum of Debits in Expense accounts
-        Net Profit = Total Revenue - Total Expenses
-    
-    Returns:
-        {
-            "revenue": float,
-            "expenses": float,
-            "profit": float,
-            "accounts": {
-                "revenue": {...},
-                "expenses": {...},
-            }
-        }
-    """
     revenue_accounts = get_account_balances_by_type(db, "revenue")
     expense_accounts = get_account_balances_by_type(db, "expense")
-    
-    total_revenue = sum(revenue_accounts.values())
+    total_revenue  = sum(revenue_accounts.values())
     total_expenses = sum(expense_accounts.values())
-    profit = total_revenue - total_expenses
-    
     return {
-        "revenue": float(total_revenue),
-        "expenses": float(total_expenses),
-        "profit": float(profit),
+        "revenue":           float(total_revenue),
+        "expenses":          float(total_expenses),
+        "profit":            float(total_revenue - total_expenses),
         "revenue_breakdown": revenue_accounts,
         "expense_breakdown": expense_accounts,
     }
 
 
 def get_balance_sheet(db: Session) -> dict:
-    """
-    Get Balance Sheet using journal entries.
-    
-    Formula:
-        Assets = Sum of all asset accounts
-        Liabilities = Sum of all liability accounts
-        Equity = Sum of all equity accounts
-        Assets = Liabilities + Equity (fundamental equation)
-    
-    Returns:
-        {
-            "assets": float,
-            "liabilities": float,
-            "equity": float,
-            "accounts": {...}
-        }
-    """
-    assets = get_account_balances_by_type(db, "asset")
+    assets      = get_account_balances_by_type(db, "asset")
     liabilities = get_account_balances_by_type(db, "liability")
-    equity = get_account_balances_by_type(db, "equity")
-    
-    total_assets = sum(assets.values())
-    total_liabilities = sum(liabilities.values())
-    total_equity = sum(equity.values())
-    
+    equity      = get_account_balances_by_type(db, "equity")
+    pnl         = calculate_profit_loss(db)
+    retained    = pnl["profit"]
+    total_equity = sum(equity.values()) + retained
     return {
-        "assets": float(total_assets),
-        "liabilities": float(total_liabilities),
-        "equity": float(total_equity),
-        "assets_breakdown": assets,
+        "assets":               float(sum(assets.values())),
+        "liabilities":          float(sum(liabilities.values())),
+        "equity":               float(total_equity),
+        "retained_earnings":    float(retained),
+        "assets_breakdown":     assets,
         "liabilities_breakdown": liabilities,
-        "equity_breakdown": equity,
+        "equity_breakdown":     {**equity, "Retained Earnings": retained},
     }
+
+
+def get_account_ledger(db: Session, account_id: int) -> list[dict]:
+    """Return all journal lines for a specific account, with running balance."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        return []
+
+    rows = (
+        db.query(JournalItem, JournalEntry)
+        .join(JournalEntry, JournalItem.journal_id == JournalEntry.id)
+        .filter(JournalItem.account_id == account_id)
+        .order_by(JournalEntry.date.asc())
+        .all()
+    )
+
+    running = 0.0
+    ledger = []
+    for item, entry in rows:
+        if account.type in ("asset", "expense"):
+            running += item.debit - item.credit
+        else:
+            running += item.credit - item.debit
+        ledger.append({
+            "date":           entry.date.isoformat() if entry.date else None,
+            "description":    entry.description,
+            "reference_type": entry.reference_type,
+            "reference_id":   entry.reference_id,
+            "debit":          float(item.debit),
+            "credit":         float(item.credit),
+            "balance":        round(running, 2),
+        })
+    return ledger

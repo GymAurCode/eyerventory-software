@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.expense import Expense
 from backend.schemas.expense import ExpenseCreate, ExpenseUpdate
+from backend.services import accounting_service
 
 
 def list_expenses(db: Session):
@@ -11,6 +12,13 @@ def list_expenses(db: Session):
 def create_expense(db: Session, payload: ExpenseCreate):
     expense = Expense(**payload.model_dump())
     db.add(expense)
+    db.flush()
+    accounting_service.record_expense(
+        db,
+        expense_id=expense.id,
+        amount=float(expense.amount),
+        category=expense.category or "",
+    )
     db.commit()
     db.refresh(expense)
     return expense

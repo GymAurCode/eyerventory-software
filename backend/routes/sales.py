@@ -18,8 +18,13 @@ def list_sales(db: Session = Depends(get_db), user=Depends(get_current_user), _=
         {
             "id": row.id,
             "product_id": row.product_id,
+            "customer_id": row.customer_id,
             "quantity": row.quantity,
             "selling_price": row.selling_price,
+            "payment_type": row.payment_type,
+            "paid_amount": row.paid_amount,
+            "due_amount": row.due_amount,
+            "due_date": row.due_date,
             "created_at": row.created_at,
         }
         for row in rows

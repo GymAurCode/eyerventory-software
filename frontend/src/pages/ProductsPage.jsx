@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { PackagePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
@@ -201,13 +202,19 @@ export default function ProductsPage() {
       label: "Actions",
       align: "right",
       render: (row) => Number(row.stock || 0) === 0 ? (
-        <div className="flex justify-end gap-2">
-          <button className="btn-soft border-emerald-500/30 text-emerald-700 dark:text-emerald-300" onClick={() => openAddStock(row)} disabled={role !== "owner"}>
-            Add Stock
-          </button>
-          <button className="btn-soft border-rose-500/30 text-rose-700 dark:text-rose-300" onClick={() => setDeleting(row)} aria-label="Delete" disabled={role !== "owner"}>
-            Delete
-          </button>
+        <div className="flex justify-end gap-1.5">
+          <div className="tooltip-wrap">
+            <button className="icon-btn icon-btn-view" onClick={() => openAddStock(row)} disabled={role !== "owner"} aria-label="Add Stock">
+              <PackagePlus size={15} />
+            </button>
+            <span className="tooltip-text">Add Stock</span>
+          </div>
+          <div className="tooltip-wrap">
+            <button className="icon-btn icon-btn-danger" onClick={() => setDeleting(row)} disabled={role !== "owner"} aria-label="Delete Record">
+              <Trash2 size={15} />
+            </button>
+            <span className="tooltip-text">Delete Record</span>
+          </div>
         </div>
       ) : (
         <ActionButtons

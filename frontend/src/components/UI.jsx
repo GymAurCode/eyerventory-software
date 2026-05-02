@@ -2,12 +2,27 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Edit3, Eye, Loader2, Trash2, X } from "lucide-react";
 import { formatPKR } from "../utils/currency";
+import { useTheme } from "../contexts/ThemeContext";
 
+// Dark theme: dark tinted border + colored glow shadow (unchanged)
+// Light theme: clean white card + colored border + minimal neutral shadow
 const toneStyles = {
-  indigo: { border: "#2A2D52", glow: "rgba(99,102,241,0.25)" },
-  emerald: { border: "#1F3A2E", glow: "rgba(34,197,94,0.25)" },
-  rose: { border: "#412325", glow: "rgba(239,68,68,0.25)" },
-  amber: { border: "#3D3220", glow: "rgba(245,158,11,0.25)" },
+  indigo: {
+    dark:  { border: "#2A2D52", shadow: "0 0 0 1px #2A2D52 inset, 0 8px 26px rgba(99,102,241,0.25)" },
+    light: { border: "#6366f1", shadow: "0 1px 4px rgba(0,0,0,0.08)" },
+  },
+  emerald: {
+    dark:  { border: "#1F3A2E", shadow: "0 0 0 1px #1F3A2E inset, 0 8px 26px rgba(34,197,94,0.25)" },
+    light: { border: "#10b981", shadow: "0 1px 4px rgba(0,0,0,0.08)" },
+  },
+  rose: {
+    dark:  { border: "#412325", shadow: "0 0 0 1px #412325 inset, 0 8px 26px rgba(239,68,68,0.25)" },
+    light: { border: "#ef4444", shadow: "0 1px 4px rgba(0,0,0,0.08)" },
+  },
+  amber: {
+    dark:  { border: "#3D3220", shadow: "0 0 0 1px #3D3220 inset, 0 8px 26px rgba(245,158,11,0.25)" },
+    light: { border: "#f59e0b", shadow: "0 1px 4px rgba(0,0,0,0.08)" },
+  },
 };
 
 export function PageHeader({ title, subtitle, actions }) {
@@ -42,19 +57,23 @@ function CountUpValue({ value, duration = 0.8, formatter = (v) => v }) {
 }
 
 export function StatCard({ title, value, tone = "indigo", money = false }) {
-  const cfg = toneStyles[tone] || toneStyles.indigo;
+  const { theme } = useTheme();
+  const cfg = (toneStyles[tone] || toneStyles.indigo)[theme] ?? (toneStyles[tone] || toneStyles.indigo).dark;
   const formatter = useMemo(() => (money ? (val) => formatPKR(Math.round(val)) : (val) => Math.round(val).toLocaleString()), [money]);
-  
-  // Use dark border color and inset border in both light and dark themes
-  const boxShadowStyle = `0 0 0 1px ${cfg.border} inset, 0 8px 26px ${cfg.glow}`;
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
       className="panel panel-hover"
-      style={{ borderColor: cfg.border, boxShadow: boxShadowStyle }}
+      style={{
+        borderColor: cfg.border,
+        borderWidth: "1px",
+        borderStyle: "solid",
+        boxShadow: cfg.shadow,
+        background: theme === "light" ? "var(--bg-card)" : undefined,
+      }}
     >
       <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{title}</p>
       <p className="mt-2 text-xl font-semibold">
@@ -110,10 +129,31 @@ export function LoadingSkeleton({ rows = 5 }) {
 
 export function ActionButtons({ onView, onEdit, onDelete, disableEdit = false, disableDelete = false }) {
   return (
-    <div className="flex justify-end gap-2">
-      <button className="icon-btn" onClick={onView} aria-label="View"><Eye size={16} /></button>
-      <button className="icon-btn" onClick={onEdit} aria-label="Edit" disabled={disableEdit}><Edit3 size={16} /></button>
-      <button className="icon-btn icon-btn-danger" onClick={onDelete} aria-label="Delete" disabled={disableDelete}><Trash2 size={16} /></button>
+    <div className="flex justify-end gap-1.5">
+      {onView && (
+        <div className="tooltip-wrap">
+          <button className="icon-btn icon-btn-view" onClick={onView} aria-label="View Details">
+            <Eye size={15} />
+          </button>
+          <span className="tooltip-text">View Details</span>
+        </div>
+      )}
+      {onEdit && (
+        <div className="tooltip-wrap">
+          <button className="icon-btn icon-btn-edit" onClick={onEdit} aria-label="Edit Record" disabled={disableEdit}>
+            <Edit3 size={15} />
+          </button>
+          <span className="tooltip-text">Edit Record</span>
+        </div>
+      )}
+      {onDelete && (
+        <div className="tooltip-wrap">
+          <button className="icon-btn icon-btn-danger" onClick={onDelete} aria-label="Delete Record" disabled={disableDelete}>
+            <Trash2 size={15} />
+          </button>
+          <span className="tooltip-text">Delete Record</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.routes.deps import require_roles
-from backend.schemas.product import ProductAddStock, ProductCreate, ProductRead, ProductUpdate
+from backend.schemas.product import (
+    ImportSummary,
+    ProductAddStock,
+    ProductCreate,
+    ProductRead,
+    ProductUpdate,
+)
 from backend.services import product_service
+from backend.services.import_service import (
+    generate_template_xlsx,
+    import_products,
+    preview_excel,
+)
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -46,3 +58,56 @@ def add_stock(product_id: int, payload: ProductAddStock, db: Session = Depends(g
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     return product
+
+
+# ---------------------------------------------------------------------------
+# Excel Import
+# ---------------------------------------------------------------------------
+
+@router.get("/import/template")
+def download_template(_=Depends(require_roles("owner", "staff"))):
+    """Download a sample Excel template for bulk product import."""
+    try:
+        xlsx_bytes = generate_template_xlsx()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=products_template.xlsx"},
+    )
+
+
+@router.post("/import/preview")
+async def preview_import(
+    file: UploadFile = File(...),
+    _=Depends(require_roles("owner", "staff")),
+):
+    """Parse the uploaded Excel and return a preview without writing to DB."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are supported")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        return preview_excel(content)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/import", response_model=ImportSummary)
+async def import_products_endpoint(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles("owner", "staff")),
+):
+    """UPSERT products from an Excel file. Returns detailed per-row results."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are supported")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+    try:
+        return import_products(db, content)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

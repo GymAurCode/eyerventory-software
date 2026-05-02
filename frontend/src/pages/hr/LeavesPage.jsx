@@ -52,9 +52,9 @@ export default function LeavesPage() {
 
   const statusBadge = (status) => {
     const map = {
-      pending: "bg-amber-900/40 text-amber-400",
-      approved: "bg-emerald-900/40 text-emerald-400",
-      rejected: "bg-rose-900/40 text-rose-400",
+      pending:  "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+      approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+      rejected: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300",
     };
     return (
       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${map[status] || ""}`}>
@@ -74,8 +74,8 @@ export default function LeavesPage() {
       key: "actions", label: "",
       render: (r) => r.status === "pending" ? (
         <div className="flex justify-end gap-2">
-          <button className="btn-soft px-3 py-1 text-xs text-emerald-400" onClick={() => handleApprove(r.id, "approved")}>Approve</button>
-          <button className="btn-soft px-3 py-1 text-xs text-rose-400" onClick={() => handleApprove(r.id, "rejected")}>Reject</button>
+          <button className="btn-soft px-3 py-1 text-xs text-emerald-600 dark:text-emerald-400" onClick={() => handleApprove(r.id, "approved")}>Approve</button>
+          <button className="btn-soft px-3 py-1 text-xs text-rose-600 dark:text-rose-400" onClick={() => handleApprove(r.id, "rejected")}>Reject</button>
         </div>
       ) : null,
     },

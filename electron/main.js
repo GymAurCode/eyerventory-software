@@ -3,9 +3,11 @@ const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
+const getPort = require("get-port");
+const findProcess = require("find-process");
 // License module — isolated, no impact on updater or inventory backend
 const licenseService = require("./license/licenseService");
 
@@ -60,10 +62,14 @@ const isDev = !app.isPackaged;
 
 let mainWindow;
 let backendProcess = null;
-let licenseBackendProcess;  // License service process (port 8001)
+let licenseBackendProcess;  // License service process
 let backendSpawnError = null; // set if spawn itself fails
 const BACKEND_HOST = "127.0.0.1";
-const BACKEND_PORT = "8000";
+let BACKEND_PORT = null; // Will be dynamically allocated
+const LICENSE_PORT = 8001; // Fixed port for license service
+const PORT_RANGE_START = 8000;
+const PORT_RANGE_END = 8100;
+const MAX_STARTUP_RETRIES = 3;
 
 /* ---------------- BACKEND READY CHECK ---------------- */
 /**
@@ -72,6 +78,10 @@ const BACKEND_PORT = "8000";
  */
 function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
   return new Promise((resolve, reject) => {
+    if (!BACKEND_PORT) {
+      return reject(new Error("Backend port not allocated"));
+    }
+
     const deadline = Date.now() + maxWaitMs;
 
     function attempt() {
@@ -82,7 +92,7 @@ function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
 
       const req = http.get(`http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`, (res) => {
         if (res.statusCode < 500) {
-          log.info("[backend] health check passed");
+          log.info("[backend] health check passed on port", BACKEND_PORT);
           resolve();
         } else {
           retry();
@@ -114,6 +124,11 @@ function waitForBackend(maxWaitMs = 90000, intervalMs = 600) {
   });
 }
 
+/* ---------------- PORT & PROCESS MANAGEMENT ---------------- */
+
+/**
+ * Check if a port is in use
+ */
 function isPortInUse(port, host = BACKEND_HOST) {
   return new Promise((resolve) => {
     const server = net.createServer();
@@ -121,7 +136,7 @@ function isPortInUse(port, host = BACKEND_HOST) {
       if (err.code === "EADDRINUSE") {
         resolve(true);
       } else {
-        log.warn(`[backend] port check error on ${host}:${port}:`, err.message);
+        log.warn(`[port-check] error on ${host}:${port}:`, err.message);
         resolve(false);
       }
     });
@@ -132,8 +147,127 @@ function isPortInUse(port, host = BACKEND_HOST) {
   });
 }
 
+/**
+ * Find and kill processes using a specific port on Windows
+ */
+async function killProcessOnPort(port) {
+  if (process.platform !== "win32") {
+    log.warn("[process-cleanup] killProcessOnPort only implemented for Windows");
+    return false;
+  }
+
+  try {
+    log.info(`[process-cleanup] searching for processes on port ${port}...`);
+    const processList = await findProcess("port", port);
+    
+    if (processList.length === 0) {
+      log.info(`[process-cleanup] no process found on port ${port}`);
+      return false;
+    }
+
+    for (const proc of processList) {
+      log.info(`[process-cleanup] found process: PID=${proc.pid} name=${proc.name} on port ${port}`);
+      try {
+        execSync(`taskkill /F /PID ${proc.pid}`, { windowsHide: true });
+        log.info(`[process-cleanup] killed PID ${proc.pid}`);
+      } catch (err) {
+        log.warn(`[process-cleanup] failed to kill PID ${proc.pid}:`, err.message);
+      }
+    }
+    
+    // Wait a bit for the port to be released
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return true;
+  } catch (err) {
+    log.error("[process-cleanup] error finding/killing process:", err.message);
+    return false;
+  }
+}
+
+/**
+ * Clean up stale backend processes (Python/Node/Electron processes that might be holding ports)
+ */
+async function cleanupStaleProcesses() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  try {
+    log.info("[process-cleanup] checking for stale backend processes...");
+    
+    // Look for uvicorn, python, and backend.exe processes
+    const processNames = ["uvicorn", "python.exe", "backend.exe"];
+    
+    for (const name of processNames) {
+      try {
+        const processList = await findProcess("name", name);
+        for (const proc of processList) {
+          // Skip our own process
+          if (proc.pid === process.pid) continue;
+          
+          // Check if it's a backend process by looking at command line
+          const cmdLine = proc.cmd || "";
+          if (cmdLine.includes("backend") || cmdLine.includes("uvicorn") || cmdLine.includes("main:app")) {
+            log.info(`[process-cleanup] found stale backend process: PID=${proc.pid} cmd=${cmdLine}`);
+            try {
+              execSync(`taskkill /F /PID ${proc.pid}`, { windowsHide: true });
+              log.info(`[process-cleanup] killed stale process PID ${proc.pid}`);
+            } catch (err) {
+              log.warn(`[process-cleanup] failed to kill PID ${proc.pid}:`, err.message);
+            }
+          }
+        }
+      } catch (err) {
+        // Process not found or error - continue
+        log.debug(`[process-cleanup] no ${name} processes found or error:`, err.message);
+      }
+    }
+    
+    // Wait for processes to fully terminate
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    log.info("[process-cleanup] stale process cleanup complete");
+  } catch (err) {
+    log.error("[process-cleanup] error during cleanup:", err.message);
+  }
+}
+
+/**
+ * Allocate a free port in the specified range
+ */
+async function allocatePort(preferredPort = PORT_RANGE_START) {
+  try {
+    // First try the preferred port
+    const portInUse = await isPortInUse(preferredPort);
+    if (!portInUse) {
+      log.info(`[port-allocation] preferred port ${preferredPort} is available`);
+      return preferredPort;
+    }
+
+    log.warn(`[port-allocation] preferred port ${preferredPort} is in use, trying to free it...`);
+    
+    // Try to kill the process using the port
+    const killed = await killProcessOnPort(preferredPort);
+    if (killed) {
+      const stillInUse = await isPortInUse(preferredPort);
+      if (!stillInUse) {
+        log.info(`[port-allocation] freed port ${preferredPort}`);
+        return preferredPort;
+      }
+    }
+
+    // If we couldn't free the preferred port, find an alternative
+    log.info(`[port-allocation] searching for alternative port in range ${PORT_RANGE_START}-${PORT_RANGE_END}...`);
+    const port = await getPort({ port: getPort.makeRange(PORT_RANGE_START, PORT_RANGE_END) });
+    log.info(`[port-allocation] allocated alternative port ${port}`);
+    return port;
+  } catch (err) {
+    log.error("[port-allocation] failed to allocate port:", err.message);
+    throw new Error(`Failed to allocate port: ${err.message}`);
+  }
+}
+
 /* ---------------- LICENSE BACKEND START ---------------- */
-function startLicenseBackend() {
+async function startLicenseBackend() {
   const licenseDbPath = path.join(app.getPath("userData"), "license.db");
   const env = { ...process.env, LICENSE_DB_PATH: licenseDbPath };
 
@@ -148,25 +282,49 @@ function startLicenseBackend() {
       return;
     }
     // cwd = license_service/ so bare imports (database, models, service) resolve correctly
-    args = ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8001"];
+    args = ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", String(LICENSE_PORT)];
     options = { env, windowsHide: true, detached: false, cwd: licenseServiceDir };
   } else {
     const backendDir = path.join(process.resourcesPath, "backend");
     executable = path.join(backendDir, "license_service.exe");
+    
     if (!fs.existsSync(executable)) {
-      log.warn("[license-backend] license_service.exe not found — skipping");
+      log.error("[license-backend] license_service.exe not found at:", executable);
+      log.error("[license-backend] Contents of backendDir:", fs.readdirSync(backendDir).join(", "));
+      log.warn("[license-backend] License service will not be available");
       return;
     }
+    
     args = [];
     options = { env, windowsHide: true, detached: false, cwd: backendDir };
   }
 
+  // Check if license port is in use
+  const portInUse = await isPortInUse(LICENSE_PORT);
+  if (portInUse) {
+    log.warn(`[license-backend] port ${LICENSE_PORT} is in use, attempting to free it...`);
+    await killProcessOnPort(LICENSE_PORT);
+    
+    // Verify port is now free
+    const stillInUse = await isPortInUse(LICENSE_PORT);
+    if (stillInUse) {
+      log.error(`[license-backend] could not free port ${LICENSE_PORT}, license service will not start`);
+      return;
+    }
+  }
+
+  log.info(`[license-backend] starting on port ${LICENSE_PORT}...`);
+  log.info(`[license-backend] executable: ${executable}`);
+  
   licenseBackendProcess = spawn(executable, args, options);
   licenseBackendProcess.stdout?.on("data", (d) => log.info("[license:stdout]", d.toString().trim()));
   licenseBackendProcess.stderr?.on("data", (d) => log.info("[license:stderr]", d.toString().trim()));
   licenseBackendProcess.on("error", (err) => log.error("[license-backend] spawn error:", err.message));
   licenseBackendProcess.on("exit", (code) => log.info("[license-backend] exited code:", code));
-  if (licenseBackendProcess.pid) log.info("[license-backend] PID:", licenseBackendProcess.pid);
+  
+  if (licenseBackendProcess.pid) {
+    log.info("[license-backend] started with PID:", licenseBackendProcess.pid);
+  }
 }
 
 /* ---------------- BACKEND START ---------------- */
@@ -176,9 +334,22 @@ async function startBackend() {
     return;
   }
 
-  const portInUse = await isPortInUse(Number(BACKEND_PORT), BACKEND_HOST);
-  if (portInUse) {
-    log.warn(`[backend] port ${BACKEND_HOST}:${BACKEND_PORT} already in use, skipping backend spawn`);
+  // Reset error state
+  backendSpawnError = null;
+
+  // Step 1: Clean up any stale processes
+  log.info("[backend] ========== BACKEND STARTUP SEQUENCE ==========");
+  await cleanupStaleProcesses();
+
+  // Step 2: Allocate a port (with retry logic built-in)
+  try {
+    BACKEND_PORT = await allocatePort(PORT_RANGE_START);
+    log.info(`[backend] allocated port: ${BACKEND_PORT}`);
+  } catch (err) {
+    const msg = `Failed to allocate port for backend:\n\n${err.message}\n\nPlease close any applications using ports ${PORT_RANGE_START}-${PORT_RANGE_END}.`;
+    log.error("[backend]", msg);
+    dialog.showErrorBox("Backend Port Allocation Failed", msg);
+    app.quit();
     return;
   }
 
@@ -191,12 +362,13 @@ async function startBackend() {
   }
 
   log.info("[backend] DB_PATH =", dbPath);
+  log.info("[backend] BACKEND_PORT =", BACKEND_PORT);
   log.info("[backend] Environment: " + (isDev ? "DEVELOPMENT" : "PRODUCTION (app.isPackaged=true)"));
 
   const env = {
     ...process.env,
     DB_PATH: dbPath,
-    BACKEND_PORT,
+    BACKEND_PORT: String(BACKEND_PORT),
   };
 
   let executable, args, options, backendDir;
@@ -252,7 +424,7 @@ async function startBackend() {
     args = [
       "-m", "uvicorn", "backend.main:app",
       "--host", BACKEND_HOST,
-      "--port", BACKEND_PORT,
+      "--port", String(BACKEND_PORT),
       "--reload",
     ];
     options = { 
@@ -276,6 +448,7 @@ async function startBackend() {
   log.info(`[backend] args: ${JSON.stringify(args)}`);
   log.info(`[backend] cwd: ${options.cwd}`);
 
+  // Step 3: Spawn the backend process
   backendProcess = spawn(executable, args, options);
 
   backendProcess.stdout.on("data", (d) =>
@@ -295,12 +468,21 @@ async function startBackend() {
   backendProcess.on("exit", (code, signal) => {
     log.warn(`[backend] exited — code=${code} signal=${signal}`);
     backendProcess = null;
+    
+    // If backend crashes unexpectedly, log it
+    if (code !== 0 && code !== null) {
+      log.error(`[backend] unexpected exit with code ${code}`);
+    }
   });
 
   // Log PID for debugging
   if (backendProcess.pid) {
     log.info(`[backend] started with PID: ${backendProcess.pid}`);
+  } else {
+    log.error("[backend] failed to get PID - process may not have started");
   }
+  
+  log.info("[backend] ===============================================");
 }
 
 /* ---------------- WINDOW ---------------- */
@@ -314,8 +496,14 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false, // required: allows file:// page to call http://127.0.0.1
+      webSecurity: false,
     },
+  });
+
+  // Allow microphone + speech recognition permissions
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowed = ["media", "microphone", "speech"].includes(permission);
+    callback(allowed);
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
@@ -491,21 +679,58 @@ function setupAutoUpdate() {
 }
 
 /* ---------------- APP LIFECYCLE ---------------- */
-app.whenReady().then(async () => {
-  await startBackend();
-  startLicenseBackend();  // Start license service (port 8001)
+app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
+app.commandLine.appendSwitch("enable-speech-input");
+app.commandLine.appendSwitch("allow-http-background-page");
 
+app.whenReady().then(async () => {
+  log.info("[app] ========== APPLICATION STARTING ==========");
+  log.info("[app] version:", app.getVersion());
+  log.info("[app] platform:", process.platform);
+  log.info("[app] isPackaged:", app.isPackaged);
+  
   try {
+    // Start backend with robust error handling
+    await startBackend();
+    
+    // Start license service (non-blocking)
+    await startLicenseBackend();
+
+    // Wait for backend to be ready
+    log.info("[app] waiting for backend to be ready...");
     await waitForBackend();
     log.info("[app] backend ready — creating window");
   } catch (err) {
-    log.error("[app] backend failed to start:", err.message);
-    dialog.showErrorBox(
-      "Backend Failed to Start",
-      err.message + "\n\nThe application will now close."
-    );
-    app.quit();
-    return;
+    log.error("[app] FATAL: backend failed to start:", err.message);
+    log.error("[app] stack:", err.stack);
+    
+    const response = await dialog.showMessageBox({
+      type: "error",
+      title: "Backend Failed to Start",
+      message: "The application backend could not start.",
+      detail: err.message + "\n\nWould you like to retry?",
+      buttons: ["Retry", "View Logs", "Exit"],
+      defaultId: 0,
+      cancelId: 2
+    });
+
+    if (response.response === 0) {
+      // Retry
+      log.info("[app] user requested retry, restarting app...");
+      app.relaunch();
+      app.quit();
+      return;
+    } else if (response.response === 1) {
+      // View logs
+      const logPath = path.join(app.getPath("userData"), "logs", "main.log");
+      require("electron").shell.openPath(logPath);
+      app.quit();
+      return;
+    } else {
+      // Exit
+      app.quit();
+      return;
+    }
   }
 
   // ── LICENSE CHECK (runs before window loads) ──────────────────────────────
@@ -525,6 +750,8 @@ app.whenReady().then(async () => {
   if (app.isPackaged) {
     setupAutoUpdate();
   }
+  
+  log.info("[app] ========== APPLICATION READY ==========");
 });
 
 app.on("window-all-closed", () => {
@@ -540,6 +767,15 @@ app.on("before-quit", () => {
 
 /* ---------------- IPC ---------------- */
 ipcMain.handle("app:getVersion", () => app.getVersion());
+
+// Expose backend port to frontend
+ipcMain.handle("app:getBackendPort", () => {
+  if (!BACKEND_PORT) {
+    log.error("[ipc] backend port requested but not allocated");
+    return null;
+  }
+  return BACKEND_PORT;
+});
 
 // Manual update check (for testing or user-triggered checks)
 ipcMain.handle("app:checkForUpdates", async () => {

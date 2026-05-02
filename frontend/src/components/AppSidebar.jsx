@@ -4,53 +4,103 @@ import { useTheme } from "../contexts/ThemeContext";
 
 export default function AppSidebar({ collapsed, onToggle, items, companyName }) {
   const { theme } = useTheme();
-  
+  const isDark = theme === "dark";
+
   return (
     <aside
-      className="flex flex-col border-r px-3 py-4 transition-all duration-300"
-      style={{ width: collapsed ? "72px" : "240px", borderColor: "var(--border-color)", background: "var(--bg-card)" }}
+      className="sticky top-0 h-screen shrink-0 overflow-y-auto overflow-x-hidden flex-col border-r px-2 py-3 transition-all duration-300"
+      style={{
+        display: "flex",
+        width: collapsed ? "56px" : "200px",
+        borderColor: "var(--border-color)",
+        background: "var(--bg-card)",
+      }}
     >
-      <div className={`mb-6 flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
-        {!collapsed && <p className="truncate text-lg font-semibold">{companyName}</p>}
-        <button className="btn-soft h-9 w-9 p-0" onClick={onToggle} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-          <MenuIcon size={18} />
+      {/* Header */}
+      <div className={`mb-4 flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
+        {!collapsed && (
+          <p className="truncate text-sm font-semibold leading-tight" style={{ maxWidth: "130px" }}>
+            {companyName}
+          </p>
+        )}
+        <button
+          className="btn-soft h-7 w-7 shrink-0 p-0"
+          onClick={onToggle}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <MenuIcon size={14} />
         </button>
       </div>
-      <nav className="space-y-1.5">
+
+      {/* Nav items */}
+      <nav className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
+          const iconColor = item.color || "var(--text-secondary)";
+
           return (
             <NavLink
               key={item.route}
               to={item.route}
-              title={collapsed ? item.label : ""}
-              className={({ isActive }) =>
-                `group flex items-center rounded-lg border transition-all duration-200 ${collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5"} ${
-                  isActive ? "text-white" : ""
-                }`
-              }
+              end={item.end ?? true}
+              title={item.label}
+              className={`group flex items-center rounded-md border transition-all duration-200 ${
+                collapsed ? "justify-center px-0 py-1.5" : "gap-2 px-2 py-1.5"
+              }`}
               style={({ isActive }) => {
-                if (isActive && theme === "light") {
+                if (!isActive) {
+                  return {
+                    color: "var(--text-secondary)",
+                    background: "transparent",
+                    borderColor: "transparent",
+                  };
+                }
+                if (isDark) {
                   return {
                     color: "#ffffff",
-                    background: "#282950",
-                    borderColor: "#282950",
+                    background: `color-mix(in srgb, ${iconColor} 22%, var(--bg-card))`,
+                    borderColor: `color-mix(in srgb, ${iconColor} 50%, var(--border-color))`,
                   };
                 }
                 return {
-                  color: isActive ? "#ffffff" : "var(--text-secondary)",
-                  background: isActive ? "color-mix(in srgb, var(--accent) 28%, var(--bg-card))" : "transparent",
-                  borderColor: isActive ? "color-mix(in srgb, var(--accent) 45%, var(--border-color))" : "transparent",
+                  color: iconColor,
+                  background: `color-mix(in srgb, ${iconColor} 10%, transparent)`,
+                  borderColor: iconColor,
                 };
               }}
             >
-              <Icon size={18} strokeWidth={1.9} />
-              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded transition-all duration-200"
+                    style={
+                      isActive && isDark
+                        ? { color: "#ffffff", background: "transparent" }
+                        : {
+                            color: iconColor,
+                            background: `color-mix(in srgb, ${iconColor} 14%, transparent)`,
+                          }
+                    }
+                  >
+                    <Icon size={13} strokeWidth={2} />
+                  </span>
+
+                  {!collapsed && (
+                    <span
+                      className="truncate text-xs font-medium leading-tight"
+                      style={isActive && !isDark ? { color: iconColor } : undefined}
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                </>
+              )}
             </NavLink>
           );
         })}
       </nav>
-      <div className="mt-auto pt-4 text-center text-xs" style={{ color: "var(--text-secondary)" }}>
+
+      <div className="mt-auto pt-3 text-center" style={{ color: "var(--text-secondary)", fontSize: "10px" }}>
         {!collapsed && "Powered by Eyercall"}
       </div>
     </aside>

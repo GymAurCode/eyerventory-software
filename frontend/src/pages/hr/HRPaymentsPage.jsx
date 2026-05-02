@@ -79,7 +79,7 @@ export default function HRPaymentsPage() {
     {
       key: "is_reversed", label: "Status",
       render: (r) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_reversed ? "bg-rose-900/40 text-rose-400" : "bg-emerald-900/40 text-emerald-400"}`}>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.is_reversed ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"}`}>
           {r.is_reversed ? "Reversed" : "Active"}
         </span>
       ),
@@ -87,7 +87,7 @@ export default function HRPaymentsPage() {
     {
       key: "actions", label: "",
       render: (r) => !r.is_reversed ? (
-        <button className="btn-soft px-3 py-1 text-xs text-rose-400" onClick={() => { setSelectedPayment(r); setShowReverseModal(true); }}>
+        <button className="btn-soft px-3 py-1 text-xs text-rose-600 dark:text-rose-400" onClick={() => { setSelectedPayment(r); setShowReverseModal(true); }}>
           Reverse
         </button>
       ) : null,

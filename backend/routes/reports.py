@@ -11,7 +11,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/data")
 def report_data(
-    report_type: str = Query(pattern="^(products|sales|expenses|finance|partner_profit)$"),
+    report_type: str = Query(pattern="^(products|sales|expenses|finance|partner_profit|credit_summary)$"),
     db: Session = Depends(get_db),
     _=Depends(require_roles("owner")),
 ):
@@ -24,7 +24,7 @@ def report_data(
 
 @router.get("/export")
 def export_report(
-    report_type: str = Query(pattern="^(products|sales|expenses|finance|partner_profit)$"),
+    report_type: str = Query(pattern="^(products|sales|expenses|finance|partner_profit|credit_summary)$"),
     fmt: str = Query(pattern="^(excel)$"),
     db: Session = Depends(get_db),
     _=Depends(require_roles("owner")),
@@ -41,3 +41,11 @@ def export_report(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/credit-summary")
+def report_credit_summary(
+    db: Session = Depends(get_db),
+    _=Depends(require_roles("owner")),
+):
+    return report_service.get_credit_summary_payload(db)
