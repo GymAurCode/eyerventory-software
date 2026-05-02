@@ -1,6 +1,10 @@
 {
   "name": "eyerflow",
+<<<<<<< HEAD
   "version": "1.0.0",  
+=======
+  "version": "1.0.8",  
+>>>>>>> 46e9926520814fb4499ac2438f234e1b68d13f85
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
   "author": "Eyercall",
@@ -13,6 +17,7 @@
     "electron": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND,ELECTRON -c cyan,magenta,yellow \"npm run dev:backend\" \"wait-on http://127.0.0.1:8000/api/health && npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "node scripts/build-backend.js",
+    "ai:check": "python scripts/run-ai-checks.py",
     "build": "npm run build:frontend && npm run build:backend && electron-builder",
     "dist": "npm run build"
   },

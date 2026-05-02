@@ -1,50 +1,136 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import api from "../../api/client";
 import { Modal, PageHeader } from "../../components/UI";
 
-export default function BackupPage() {
-  const [hasElectron, setHasElectron] = useState(false);
-  const [loading, setLoading] = useState(null); // "backup" | "restore" | "auto"
+function Toggle({ checked, onChange, disabled }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      disabled={disabled}
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        width: "44px",
+        height: "24px",
+        borderRadius: "9999px",
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        padding: 0,
+        flexShrink: 0,
+        transition: "background 0.2s",
+        background: checked ? "#6366f1" : "#404040",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: "3px",
+          left: checked ? "23px" : "3px",
+          width: "18px",
+          height: "18px",
+          borderRadius: "50%",
+          background: "#ffffff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+          transition: "left 0.2s",
+        }}
+      />
+    </button>
+  );
+}
+
+export default function BackupPage({ embedded = false }) {
+  const [status, setStatus] = useState(null);       // backup status from API
+  const [loading, setLoading] = useState(null);     // "manual" | "toggle" | "status"
+  const [keepHistory, setKeepHistory] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState(
-    localStorage.getItem("hr_auto_backup") === "1"
-  );
-  const [lastBackup, setLastBackup] = useState(localStorage.getItem("hr_last_backup") || null);
+  const [restoring, setRestoring] = useState(false);
+  const hasElectron = !!window.electronAPI;
 
-  useEffect(() => {
-    setHasElectron(!!window.electronAPI);
-  }, []);
-
-  const handleManualBackup = async () => {
-    if (!window.electronAPI) return toast.error("Backup only available in desktop app");
-    setLoading("backup");
+  const loadStatus = async () => {
+    setLoading("status");
     try {
-      const result = await window.electronAPI.backupCreate();
-      if (result.ok) {
-        const now = new Date().toLocaleString();
-        localStorage.setItem("hr_last_backup", now);
-        setLastBackup(now);
-        toast.success("Backup saved successfully");
-      } else {
-        toast.info("Backup cancelled");
-      }
+      const { data } = await api.get("/settings/backup/status");
+      setStatus(data);
+      setKeepHistory(data.keep_history ?? false);
     } catch {
-      toast.error("Backup failed");
+      // backend might not have backup endpoints yet — fail silently
     } finally {
       setLoading(null);
     }
   };
 
+  useEffect(() => { loadStatus(); }, []);
+
+  // Manual backup — calls backend which copies the DB file
+  const handleManualBackup = async () => {
+    setLoading("manual");
+    try {
+      const { data } = await api.post("/settings/backup/now");
+      toast.success("Backup created successfully");
+      setStatus((prev) => ({ ...prev, last_backup_at: data.backed_up_at, backup_exists: true }));
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Backup failed");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // Toggle auto-backup on/off
+  const handleToggleAuto = async () => {
+    if (!status) return;
+    const enabling = !status.enabled;
+    setLoading("toggle");
+    try {
+      const { data } = await api.post("/settings/backup/configure", {
+        enabled: enabling,
+        keep_history: keepHistory,
+      });
+      setStatus((prev) => ({
+        ...prev,
+        enabled: data.auto_backup ?? enabling,
+        last_backup_at: data.backed_up_at ?? prev?.last_backup_at,
+        next_backup_at: data.next_backup_at ?? null,
+        backup_exists: data.ok ? true : prev?.backup_exists,
+      }));
+      toast.success(enabling ? "Auto backup enabled — backup created immediately" : "Auto backup disabled");
+      // Refresh to get next_backup_at from scheduler
+      setTimeout(loadStatus, 800);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to configure auto backup");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // Keep-history toggle — reconfigure with new setting
+  const handleKeepHistoryChange = async (next) => {
+    setKeepHistory(next);
+    if (status?.enabled) {
+      try {
+        await api.post("/settings/backup/configure", { enabled: true, keep_history: next });
+        toast.success(next ? "History mode on — each backup saved separately" : "Overwrite mode on — single backup file");
+        loadStatus();
+      } catch {
+        toast.error("Failed to update backup mode");
+      }
+    }
+  };
+
+  // Electron restore (file-picker based, still needs Electron)
   const handleRestore = async (e) => {
     e.preventDefault();
-    // Basic admin password check (matches owner password via API would be ideal,
-    // but for offline-first we check against a stored hash via the backend)
-    setLoading("restore");
+    if (!hasElectron) return toast.error("Restore only available in the desktop app");
+    setRestoring(true);
     try {
       const result = await window.electronAPI.backupRestore();
       if (result.ok) {
-        toast.success("Backup restored. Restarting app...");
+        toast.success("Backup restored. Restarting…");
         setTimeout(() => window.location.reload(), 1500);
       } else {
         toast.info("Restore cancelled");
@@ -52,99 +138,88 @@ export default function BackupPage() {
     } catch {
       toast.error("Restore failed");
     } finally {
-      setLoading(null);
+      setRestoring(false);
       setShowRestoreConfirm(false);
       setAdminPassword("");
     }
   };
 
-  const toggleAutoBackup = () => {
-    const next = !autoBackupEnabled;
-    setAutoBackupEnabled(next);
-    localStorage.setItem("hr_auto_backup", next ? "1" : "0");
-    // Notify electron main process
-    if (window.electronAPI?.setAutoBackup) {
-      window.electronAPI.setAutoBackup(next);
-    }
-    toast.success(next ? "Auto backup enabled (every 24h)" : "Auto backup disabled");
-  };
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString() : "—";
 
   return (
-    <div>
-      <PageHeader title="Backup & Restore" subtitle="Protect your data with regular backups" />
+    <div className="space-y-4">
+      {!embedded && <PageHeader title="Backup & Restore" subtitle="Protect your data with regular backups" />}
 
       <div className="grid gap-4 md:grid-cols-2">
+
         {/* Manual Backup */}
         <div className="panel space-y-4">
           <div>
             <p className="font-semibold">Manual Backup</p>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Save a copy of the database to your chosen location.
+              Immediately copy the database to the backup folder.
             </p>
-            {lastBackup && (
+            {status?.last_backup_at && (
               <p className="mt-2 text-xs" style={{ color: "var(--text-secondary)" }}>
-                Last backup: {lastBackup}
+                Last backup: {fmt(status.last_backup_at)}
+              </p>
+            )}
+            {status?.backup_path && (
+              <p className="mt-1 text-xs font-mono truncate" style={{ color: "var(--text-muted)" }}>
+                {status.backup_path}
               </p>
             )}
           </div>
           <button
             className="btn-primary w-full"
             onClick={handleManualBackup}
-            disabled={loading === "backup" || !hasElectron}
+            disabled={loading === "manual"}
           >
-            {loading === "backup" ? "Saving..." : "Create Backup"}
+            {loading === "manual" ? "Creating backup…" : "Create Backup Now"}
           </button>
-          {!hasElectron && (
-            <p className="text-xs text-amber-400">Only available in the desktop application.</p>
-          )}
         </div>
 
         {/* Auto Backup */}
         <div className="panel space-y-4">
           <div>
-            <p className="font-semibold">Auto Backup</p>
+            <p className="font-semibold">Auto Backup (every 24h)</p>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Automatically backup every 24 hours to the app data folder.
+              Automatically backs up every 24 hours. Runs immediately when enabled.
             </p>
           </div>
+
           <div className="flex items-center gap-3">
-            <button
-              onClick={toggleAutoBackup}
-              role="switch"
-              aria-checked={autoBackupEnabled}
-              style={{
-                position: "relative",
-                display: "inline-flex",
-                alignItems: "center",
-                width: "44px",
-                height: "24px",
-                borderRadius: "9999px",
-                border: "none",
-                cursor: "pointer",
-                padding: 0,
-                flexShrink: 0,
-                transition: "background 0.2s",
-                background: autoBackupEnabled ? "#6366f1" : "#404040",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: "3px",
-                  left: autoBackupEnabled ? "23px" : "3px",
-                  width: "18px",
-                  height: "18px",
-                  borderRadius: "50%",
-                  background: "#ffffff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
-                  transition: "left 0.2s",
-                }}
-              />
-            </button>
-            <span className="text-sm" style={{ color: autoBackupEnabled ? "var(--text-primary)" : "var(--text-secondary)" }}>
-              {autoBackupEnabled ? "Enabled" : "Disabled"}
+            <Toggle
+              checked={status?.enabled ?? false}
+              onChange={handleToggleAuto}
+              disabled={loading === "toggle" || loading === "status"}
+            />
+            <span className="text-sm" style={{ color: status?.enabled ? "var(--text-primary)" : "var(--text-secondary)" }}>
+              {loading === "toggle" ? "Updating…" : status?.enabled ? "Enabled" : "Disabled"}
             </span>
           </div>
+
+          {status?.enabled && (
+            <div className="space-y-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+              {status.last_backup_at && <p>Last: {fmt(status.last_backup_at)}</p>}
+              {status.next_backup_at && <p>Next: {fmt(status.next_backup_at)}</p>}
+            </div>
+          )}
+
+          {/* Keep history option */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={keepHistory}
+              onChange={(e) => handleKeepHistoryChange(e.target.checked)}
+            />
+            <span>Keep history backups (one file per day)</span>
+          </label>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {keepHistory
+              ? "Each backup saved as a separate dated file."
+              : "Single file overwritten each time (saves disk space)."}
+          </p>
         </div>
 
         {/* Restore */}
@@ -152,8 +227,7 @@ export default function BackupPage() {
           <div>
             <p className="font-semibold">Restore Backup</p>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Replace the current database with a backup file. This will restart the application.
-              Admin password is required.
+              Replace the current database with a backup file. Requires the desktop app and admin password.
             </p>
           </div>
           <button
@@ -161,14 +235,17 @@ export default function BackupPage() {
             onClick={() => setShowRestoreConfirm(true)}
             disabled={!hasElectron}
           >
-            Restore from Backup...
+            Restore from Backup…
           </button>
+          {!hasElectron && (
+            <p className="text-xs text-amber-400">Restore is only available in the desktop application.</p>
+          )}
         </div>
       </div>
 
       <Modal title="Confirm Restore" open={showRestoreConfirm} onClose={() => setShowRestoreConfirm(false)} maxWidth="max-w-md">
         <p className="mb-4 text-sm" style={{ color: "var(--text-secondary)" }}>
-          This will replace all current data with the backup. This action cannot be undone.
+          This replaces all current data with the backup. This action cannot be undone.
         </p>
         <form onSubmit={handleRestore} className="space-y-4">
           <div>
@@ -184,8 +261,8 @@ export default function BackupPage() {
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-soft" onClick={() => setShowRestoreConfirm(false)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={loading === "restore"}>
-              {loading === "restore" ? "Restoring..." : "Restore & Restart"}
+            <button type="submit" className="btn-primary" disabled={restoring}>
+              {restoring ? "Restoring…" : "Restore & Restart"}
             </button>
           </div>
         </form>

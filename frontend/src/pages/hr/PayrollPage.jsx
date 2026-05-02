@@ -7,9 +7,9 @@ import { formatPKR } from "../../utils/currency";
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
 
 const STATUS_STYLE = {
-  paid:    "bg-emerald-900/40 text-emerald-400",
-  partial: "bg-amber-900/40 text-amber-400",
-  unpaid:  "bg-rose-900/40 text-rose-400",
+  paid:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+  partial: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+  unpaid:  "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300",
 };
 
 export default function PayrollPage() {
@@ -69,12 +69,12 @@ export default function PayrollPage() {
     },
     {
       key: "paid_amount", label: "Total Paid",
-      render: (r) => <span className="text-emerald-400">{formatPKR(r.paid_amount || 0)}</span>,
+      render: (r) => <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatPKR(r.paid_amount || 0)}</span>,
     },
     {
       key: "remaining", label: "Remaining",
       render: (r) => (
-        <span className={r.remaining > 0 ? "text-amber-400" : "text-emerald-400"}>
+        <span className={r.remaining > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}>
           {formatPKR(r.remaining || 0)}
         </span>
       ),

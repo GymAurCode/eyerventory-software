@@ -9,6 +9,7 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(20), nullable=True, unique=True)
     name = Column(String(120), nullable=False, unique=True)
     type = Column(String(20), nullable=False)  # asset, liability, equity, revenue, expense
     parent_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)

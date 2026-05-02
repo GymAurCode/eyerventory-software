@@ -314,8 +314,14 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false, // required: allows file:// page to call http://127.0.0.1
+      webSecurity: false,
     },
+  });
+
+  // Allow microphone + speech recognition permissions
+  mainWindow.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+    const allowed = ["media", "microphone", "speech"].includes(permission);
+    callback(allowed);
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
@@ -491,6 +497,10 @@ function setupAutoUpdate() {
 }
 
 /* ---------------- APP LIFECYCLE ---------------- */
+app.commandLine.appendSwitch("enable-features", "WebSpeechAPI");
+app.commandLine.appendSwitch("enable-speech-input");
+app.commandLine.appendSwitch("allow-http-background-page");
+
 app.whenReady().then(async () => {
   await startBackend();
   startLicenseBackend();  // Start license service (port 8001)

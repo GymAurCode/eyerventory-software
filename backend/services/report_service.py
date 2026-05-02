@@ -9,6 +9,7 @@ from backend.models.owner_share import OwnerShare
 from backend.models.product import Product
 from backend.models.sale import Sale
 from backend.models.user import User
+from backend.services.credit_service import credit_summary
 from backend.services.finance_service import get_finance_summary
 from backend.services.settings_service import get_company_name
 
@@ -50,6 +51,16 @@ def _dataset(db: Session, report_type: str) -> tuple[list[tuple], float]:
         )
         mapped = [(name, f"{pct:.2f}%", _fmt(s["distributable_profit"] * (pct / 100))) for name, pct in rows]
         return mapped, s["distributable_profit"]
+    if report_type == "credit_summary":
+        summary = credit_summary(db)
+        rows = [
+            ("Total Receivable", _fmt(summary["total_receivable"])),
+            ("Total Payable", _fmt(summary["total_payable"])),
+            ("Overdue Amount", _fmt(summary["overdue_amount"])),
+            ("Cash Sales", _fmt(summary["cash_sales_total"])),
+            ("Credit Sales", _fmt(summary["credit_sales_total"])),
+        ]
+        return rows, summary["total_receivable"] + summary["total_payable"]
     raise ValueError("Unsupported report type")
 
 
@@ -156,6 +167,8 @@ def get_report_payload(db: Session, report_type: str) -> dict:
             for name, pct in rows
         ]
         return {"title": title, "columns": columns, "data": data}
+    if report_type == "credit_summary":
+        return get_credit_summary_payload(db)
 
     raise ValueError("Unsupported report type")
 
@@ -181,3 +194,31 @@ def generate_excel(db: Session, report_type: str) -> BytesIO:
     wb.close()
     buffer.seek(0)
     return buffer
+
+
+def get_credit_summary_payload(db: Session) -> dict:
+    summary = credit_summary(db)
+    rows = []
+    rows.extend(
+        [
+            {"section": "Totals", "name": "Total Receivable", "value": _fmt(summary["total_receivable"])},
+            {"section": "Totals", "name": "Total Payable", "value": _fmt(summary["total_payable"])},
+            {"section": "Totals", "name": "Overdue Amount", "value": _fmt(summary["overdue_amount"])},
+            {"section": "Sales Mix", "name": "Cash Sales", "value": _fmt(summary["cash_sales_total"])},
+            {"section": "Sales Mix", "name": "Credit Sales", "value": _fmt(summary["credit_sales_total"])},
+        ]
+    )
+    for row in summary["receivable_by_customer"]:
+        rows.append({"section": "Customer Receivable", "name": row["name"], "value": _fmt(row["balance"])})
+    for row in summary["payable_by_supplier"]:
+        rows.append({"section": "Supplier Payable", "name": row["name"], "value": _fmt(row["balance"])})
+    return {
+        "title": "Credit Summary Report",
+        "columns": [
+            {"header": "Section", "key": "section", "align": "left"},
+            {"header": "Name", "key": "name", "align": "left"},
+            {"header": "Amount", "key": "value", "align": "right"},
+        ],
+        "data": rows,
+        "summary": summary,
+    }

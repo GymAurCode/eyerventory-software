@@ -1,4 +1,4 @@
-function BaseIcon({ children, size = 18 }) {
+function BaseIcon({ children, size = 16 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
       {children}
@@ -218,6 +218,45 @@ export function Database(props) {
     </BaseIcon>
   );
 }
+<<<<<<< HEAD
+
+export function Bot(props) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="5" y="8" width="14" height="10" rx="2" />
+      <path d="M12 4v4M9 13h.01M15 13h.01M8 18v2M16 18v2M3 10h2M19 10h2" />
+    </BaseIcon>
+  );
+}
+
+export function Bell(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </BaseIcon>
+  );
+}
+
+export function BookOpen(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </BaseIcon>
+  );
+}
+
+export function ShoppingBag(props) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </BaseIcon>
+  );
+}
+=======
 export function Brain(props) {
   return (
     <BaseIcon {...props}>
@@ -230,3 +269,4 @@ export function Brain(props) {
     </BaseIcon>
   );
 }
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

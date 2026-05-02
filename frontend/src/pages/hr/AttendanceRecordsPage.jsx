@@ -31,9 +31,9 @@ export default function AttendanceRecordsPage() {
 
   const statusBadge = (status) => {
     const map = {
-      present: "bg-emerald-900/40 text-emerald-400",
-      late: "bg-amber-900/40 text-amber-400",
-      absent: "bg-rose-900/40 text-rose-400",
+      present: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+      late:    "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+      absent:  "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300",
     };
     return (
       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${map[status] || map.absent}`}>
@@ -78,9 +78,9 @@ export default function AttendanceRecordsPage() {
       {/* Summary */}
       <div className="mb-4 grid grid-cols-3 gap-3">
         {[
-          { label: "Present", value: present, color: "text-emerald-400" },
-          { label: "Late", value: late, color: "text-amber-400" },
-          { label: "Absent", value: absent, color: "text-rose-400" },
+          { label: "Present", value: present, color: "text-emerald-600 dark:text-emerald-400" },
+          { label: "Late",    value: late,    color: "text-amber-600 dark:text-amber-400" },
+          { label: "Absent",  value: absent,  color: "text-rose-600 dark:text-rose-400" },
         ].map((s) => (
           <div key={s.label} className="panel text-center">
             <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{s.label}</p>

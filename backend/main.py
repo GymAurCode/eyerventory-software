@@ -1,12 +1,34 @@
 import logging
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent / ".env"
+    load_dotenv(dotenv_path=_env_path, override=False)
+except ImportError:
+    pass
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+<<<<<<< HEAD
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
+from backend.core.security import get_password_hash
+from backend.database import Base, SessionLocal, engine
+from backend.ai.bootstrap import ensure_ai_seed_data
+=======
 from fastapi.responses import JSONResponse, Response
 
 from backend.database import Base, engine
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 from backend.initDb import apply_startup_migrations
 from backend.routes import (
+<<<<<<< HEAD
+    accounting, ai, attendance, auth, credits, customers, employees, expenses,
+    finance, hr_payments, ledger, leaves, partners, payroll, products,
+    purchases, reminders, reports, sales, settings, suppliers, users,
+=======
     accounting,
     attendance,
     auth,
@@ -26,6 +48,7 @@ from backend.routes import (
     settings,
     users,
     ai_intelligence,
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -33,6 +56,19 @@ logger = logging.getLogger("inventory-api")
 
 app = FastAPI(title="Inventory API", version="1.0.0")
 
+<<<<<<< HEAD
+# ---------------------------------------------------------------------------
+# CORS — allow_origins=["*"] is required for WebSocket upgrades from Electron.
+# Electron sends Origin: null (file:// context) which CORSMiddleware rejects
+# when using an explicit origins list. Using "*" makes the middleware skip
+# the origin check entirely, which also fixes WS handshake 403s.
+# Note: allow_credentials must be False when allow_origins=["*"].
+# ---------------------------------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+=======
 # CORS must be added before any middleware or exception handlers so that
 # error responses also carry the correct headers.
 CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "null"]
@@ -42,6 +78,7 @@ app.add_middleware(
     allow_origins=CORS_ORIGINS,
     allow_origin_regex=r"file://.*",
     allow_credentials=True,
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -78,6 +115,99 @@ async def logging_middleware(request: Request, call_next):
         response = await call_next(request)
         logger.info("%s %s -> %s", request.method, request.url.path, response.status_code)
         return response
+<<<<<<< HEAD
+    except Exception:
+        import traceback as _tb
+        _trace = _tb.format_exc()
+        logger.exception("Unhandled API error on %s %s:\n%s", request.method, request.url.path, _trace)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "traceback": _trace},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
+app.include_router(auth.router,       prefix="/api")
+app.include_router(products.router,   prefix="/api")
+app.include_router(purchases.router,  prefix="/api")
+app.include_router(sales.router,      prefix="/api")
+app.include_router(customers.router,  prefix="/api")
+app.include_router(suppliers.router,  prefix="/api")
+app.include_router(credits.router,    prefix="/api")
+app.include_router(ledger.router,     prefix="/api")
+app.include_router(expenses.router,   prefix="/api")
+app.include_router(finance.router,    prefix="/api")
+app.include_router(accounting.router, prefix="/api")
+app.include_router(users.router,      prefix="/api")
+app.include_router(partners.router,   prefix="/api")
+app.include_router(settings.router,   prefix="/api")
+app.include_router(reports.router,    prefix="/api")
+app.include_router(employees.router,  prefix="/api")
+app.include_router(attendance.router, prefix="/api")
+app.include_router(leaves.router,     prefix="/api")
+app.include_router(payroll.router,    prefix="/api")
+app.include_router(hr_payments.router,prefix="/api")
+app.include_router(ai.router,         prefix="/api")
+app.include_router(reminders.router,  prefix="/api")
+
+
+@app.get("/api/health", tags=["health"])
+def health_check():
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+def seed_owner_user():
+    db: Session = SessionLocal()
+    try:
+        defaults = [
+            {"name": "Owner Admin", "email": "owner@eyerflow.com", "password": "owner123", "role": "owner"},
+            {"name": "Staff User",  "email": "staff@eyerflow.com",  "password": "staff123",  "role": "staff"},
+        ]
+        for item in defaults:
+            user = db.query(User).filter(User.email == item["email"]).first()
+            if not user:
+                db.add(User(
+                    username=item["email"], name=item["name"], email=item["email"],
+                    hashed_password=get_password_hash(item["password"]),
+                    role=item["role"], status="active", is_active=True,
+                ))
+        db.flush()
+        owners = db.query(User).filter(User.role == "owner").all()
+        for owner in owners:
+            if not db.query(OwnerShare).filter(OwnerShare.user_id == owner.id).first():
+                db.add(OwnerShare(user_id=owner.id, ownership_percentage=100.0 / len(owners)))
+        db.commit()
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+def on_startup():
+    # create_all FIRST so all tables exist before migrations try to alter them
+    Base.metadata.create_all(bind=engine)
+    apply_startup_migrations()
+    seed_owner_user()
+    db = SessionLocal()
+    try:
+        logger.info("AI seed: %s", ensure_ai_seed_data(db))
+    finally:
+        db.close()
+    from backend.services.reminder_scheduler import start_scheduler
+    start_scheduler()
+    from backend.services.backup_service import resume_on_startup
+    resume_on_startup()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    from backend.services.reminder_scheduler import stop_scheduler
+    stop_scheduler()
+=======
     except Exception as exc:
         logger.exception("Unhandled middleware error")
         return JSONResponse(
@@ -126,3 +256,4 @@ app.include_router(ai_intelligence.router, prefix="/api")
 @app.get("/api/health", tags=["health"])
 def health_check():
     return {"status": "ok"}
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

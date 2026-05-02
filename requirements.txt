@@ -1,4 +1,5 @@
 fastapi==0.115.11
+python-dotenv>=1.0.0
 uvicorn[standard]==0.34.0
 sqlalchemy==2.0.39
 pydantic>=2.8,<3.0
@@ -10,4 +11,22 @@ reportlab
 XlsxWriter
 openpyxl==3.1.5
 email-validator
+<<<<<<< HEAD
+python-multipart
+numpy
+scikit-learn
+openai
+Pillow
+pytesseract
+joblib
+statsmodels
+redis
+rq
+xgboost
+faster-whisper
+apscheduler>=3.10,<4.0
+websockets>=12.0
+openpyxl>=3.1
+=======
 rapidfuzz==3.10.1
+>>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
