@@ -32,14 +32,10 @@ def main():
     from backend.database import DB_PATH
     logger.info(f"[launcher] resolved DB_PATH = {DB_PATH}")
 
-    # Get port from environment or use default
-    port = int(os.getenv("BACKEND_PORT", "8000"))
-    logger.info(f"[launcher] starting on port {port}")
-
     uvicorn.run(
         app,
         host="127.0.0.1",
-        port=port,
+        port=8000,
         log_level="info",
     )
 

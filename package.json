@@ -1,10 +1,6 @@
 {
   "name": "eyerflow",
-<<<<<<< HEAD
   "version": "1.0.8",  
-=======
-  "version": "1.0.9",  
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
   "author": "Eyercall",
@@ -21,9 +17,7 @@
   },
   "dependencies": {
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.8.3",
-    "get-port": "^5.1.1",
-    "find-process": "^1.4.7"
+    "electron-updater": "^6.8.3"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
@@ -44,11 +38,6 @@
     "extraResources": [
       {
         "from": "dist/backend",
-        "to": "backend",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "dist/license_service",
         "to": "backend",
         "filter": ["**/*"]
       }

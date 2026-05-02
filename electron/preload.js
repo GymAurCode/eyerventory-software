@@ -6,11 +6,6 @@ contextBridge.exposeInMainWorld("desktop", {
   restoreDatabase: () => ipcRenderer.invoke("backup:restore"),
 });
 
-// Electron API — exposed as window.electron
-contextBridge.exposeInMainWorld("electron", {
-  getBackendPort: () => ipcRenderer.invoke("app:getBackendPort"),
-});
-
 // HR Module API — exposed as window.electronAPI
 contextBridge.exposeInMainWorld("electronAPI", {
   backupCreate: () => ipcRenderer.invoke("backup:create"),
