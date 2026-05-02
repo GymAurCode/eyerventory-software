@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, Modal, PageHeader } from "../components/UI";
 import { useBranding } from "../contexts/BrandingContext";
 import { formatPKR } from "../utils/currency";
+import PartnersPage from "./PartnersPage";
 
 // ── Tab definitions ───────────────────────────────────────────────────────────
-const TABS = ["General", "Users", "Backup"];
+const TABS = ["General", "Users", "Partners", "Backup"];
 
 function Tabs({ active, onChange }) {
   return (
@@ -435,14 +437,23 @@ function BackupTab() {
 
 // ── Main Settings page ────────────────────────────────────────────────────────
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("General");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(initialTab ? initialTab.charAt(0).toUpperCase() + initialTab.slice(1) : "General");
+
+  const changeTab = (tab) => {
+    setActiveTab(tab);
+    const key = tab.toLowerCase();
+    setSearchParams(key === "general" ? {} : { tab: key });
+  };
 
   return (
     <div className="space-y-4">
       <PageHeader title="Settings" subtitle="General configuration, user management, and backup controls" />
-      <Tabs active={activeTab} onChange={setActiveTab} />
+      <Tabs active={activeTab} onChange={changeTab} />
       {activeTab === "General" && <GeneralTab />}
       {activeTab === "Users"   && <UsersTab />}
+      {activeTab === "Partners" && <PartnersPage embedded />}
       {activeTab === "Backup"  && <BackupTab />}
     </div>
   );

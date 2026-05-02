@@ -9,7 +9,6 @@ import DashboardPage from "./pages/DashboardPage";
 import ExpensesPage from "./pages/ExpensesPage";
 import FinancePage from "./pages/FinancePage";
 import LoginPage from "./pages/LoginPage";
-import PartnersPage from "./pages/PartnersPage";
 import ProductsPage from "./pages/ProductsPage";
 import SalesPage from "./pages/SalesPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -137,7 +136,7 @@ function Layout() {
                   <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
                   <Route path="/reports" element={<Navigate to="/analytics" replace />} />
                   <Route path="/ai-intelligence" element={<ProtectedRoute allow={["owner"]}><AIIntelligencePage /></ProtectedRoute>} />
-                  <Route path="/partners" element={<ProtectedRoute allow={["owner"]}><PartnersPage /></ProtectedRoute>} />
+                  <Route path="/partners" element={<ProtectedRoute allow={["owner"]}><Navigate to="/settings?tab=partners" replace /></ProtectedRoute>} />
                   <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
                   {/* /users and /hr/backup are now tabs inside Settings */}
                   <Route path="/users" element={<Navigate to="/settings" replace />} />

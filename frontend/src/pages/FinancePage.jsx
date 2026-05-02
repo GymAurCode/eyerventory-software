@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import api from "../api/client";
 import { PageHeader, StatCard } from "../components/UI";
 import { formatPKR } from "../utils/currency";
+import ChartOfAccountsPage from "./ChartOfAccountsPage";
+import CreditManagementPage from "./CreditManagementPage";
+import PaymentsPage from "./PaymentsPage";
 
 const DEFAULT_SUMMARY = {
   total_revenue: 0, total_cost: 0, total_expenses: 0,
@@ -18,6 +21,7 @@ export default function FinancePage() {
   const [s, setS] = useState(DEFAULT_SUMMARY);
   const [pnl, setPnl] = useState(DEFAULT_PNL);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     Promise.all([api.get("/finance/summary"), api.get("/finance/pnl")])
@@ -28,14 +32,41 @@ export default function FinancePage() {
 
   if (loading) return (
     <div className="space-y-5">
-      <PageHeader title="Finance Report" subtitle="Revenue, expenses, and profitability" />
+      <PageHeader title="Finance" subtitle="Overview, accounts, credit, and payments" />
       <div className="panel">Loading...</div>
     </div>
   );
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Finance Report" subtitle="Revenue, expenses, and profitability" />
+      <PageHeader title="Finance" subtitle="Overview, accounts, credit, and payments" />
+      <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: "var(--border-color)", background: "var(--bg-elevated)", width: "fit-content" }}>
+        {[
+          { id: "overview", label: "Overview" },
+          { id: "coa", label: "Chart of Accounts" },
+          { id: "credit", label: "Credit Management" },
+          { id: "payments", label: "Payments" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-150"
+            style={
+              activeTab === tab.id
+                ? { background: "var(--bg-card)", color: "var(--text-primary)", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }
+                : { background: "transparent", color: "var(--text-secondary)" }
+            }
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "coa" && <ChartOfAccountsPage embedded />}
+      {activeTab === "credit" && <CreditManagementPage embedded />}
+      {activeTab === "payments" && <PaymentsPage embedded />}
+      {activeTab !== "overview" ? null : (
+        <>
 
       {/* Top stats */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -122,6 +153,8 @@ export default function FinancePage() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

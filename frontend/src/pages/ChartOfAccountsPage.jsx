@@ -346,7 +346,7 @@ function JournalTab({ journal }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export default function ChartOfAccountsPage() {
+export default function ChartOfAccountsPage({ embedded = false }) {
   const [accounts, setAccounts] = useState([]);
   const [journal, setJournal] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -367,7 +367,7 @@ export default function ChartOfAccountsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Chart of Accounts" subtitle="Double-entry ledger, balance sheet, and P&L" />
+      {!embedded && <PageHeader title="Chart of Accounts" subtitle="Double-entry ledger, balance sheet, and P&L" />}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard title="Total Assets"      value={totalAssets}      tone="emerald" money />

@@ -99,12 +99,17 @@ export default function AppSidebar({ collapsed, onToggle, items, companyName }) 
 
       {/* Footer */}
       {!collapsed && (
-        <p
-          className="shrink-0 border-t py-2 text-center text-[10px]"
-          style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
+        <div
+          className="shrink-0 border-t py-2 text-center"
+          style={{ borderColor: "var(--border-color)" }}
         >
-          Powered by Eyercall
-        </p>
+          <p className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
+            Powered by Eyercall
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-secondary)", opacity: 0.6 }}>
+            v1.0.0
+          </p>
+        </div>
       )}
     </aside>
   );

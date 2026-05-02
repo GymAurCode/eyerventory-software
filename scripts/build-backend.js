@@ -1,6 +1,17 @@
 const { spawnSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
-const python = "D:\\inventroy-system\\eyerventory-software\\venv\\Scripts\\python.exe";
+// Resolve Python from the local venv (works on any machine)
+const projectRoot = path.join(__dirname, "..");
+const pythonWin = path.join(projectRoot, "venv", "Scripts", "python.exe");
+const pythonUnix = path.join(projectRoot, "venv", "bin", "python");
+const python = fs.existsSync(pythonWin) ? pythonWin : pythonUnix;
+
+if (!fs.existsSync(python)) {
+  console.error(`\nPython venv not found. Expected at:\n  ${pythonWin}\n\nRun: python -m venv venv && venv\\Scripts\\activate && pip install -r requirements.txt`);
+  process.exit(1);
+}
 const requiredPackages = [
   "uvicorn",
   "fastapi",

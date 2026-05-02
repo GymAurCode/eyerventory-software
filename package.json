@@ -1,14 +1,16 @@
 {
   "name": "eyerflow",
-  "version": "1.0.9",  
+  "version": "1.0.0",  
   "description": "Production Inventory Management System desktop app",
   "main": "electron/main.js",
   "author": "Eyercall",
   "license": "MIT",
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "venv\\Scripts\\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
     "dev:electron": "cross-env NODE_ENV=development electron .",
-    "dev": "npm run dev:frontend",
+    "dev": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND -c cyan,magenta \"npm run dev:backend\" \"wait-on http://127.0.0.1:8000/api/health && npm run dev:frontend\"",
+    "electron": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND,ELECTRON -c cyan,magenta,yellow \"npm run dev:backend\" \"wait-on http://127.0.0.1:8000/api/health && npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "node scripts/build-backend.js",
     "build": "npm run build:frontend && npm run build:backend && electron-builder",

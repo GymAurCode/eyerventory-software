@@ -90,7 +90,7 @@ function PaymentForm({ customers, suppliers, onSubmit, onClose }) {
   );
 }
 
-export default function PaymentsPage() {
+export default function PaymentsPage({ embedded = false }) {
   const [payments, setPayments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -147,15 +147,24 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Payments"
-        subtitle="Settle receivables and payables"
-        actions={
+      {!embedded && (
+        <PageHeader
+          title="Payments"
+          subtitle="Settle receivables and payables"
+          actions={
+            <button className="btn-primary" onClick={() => setShowForm(true)}>
+              <Plus size={16} className="mr-1 inline" />New Payment
+            </button>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="mb-4 flex justify-end">
           <button className="btn-primary" onClick={() => setShowForm(true)}>
             <Plus size={16} className="mr-1 inline" />New Payment
           </button>
-        }
-      />
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <StatCard title="Total Payments" value={payments.length} tone="indigo" />

@@ -4,7 +4,7 @@ import api from "../api/client";
 import { DataTable, PageHeader } from "../components/UI";
 import { formatPKR } from "../utils/currency";
 
-export default function PartnersPage() {
+export default function PartnersPage({ embedded = false }) {
   const [rows, setRows] = useState([]);
   const [editing, setEditing] = useState({});
   const load = () => api.get("/partners").then((r) => setRows(r.data));
@@ -25,7 +25,7 @@ export default function PartnersPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Partners / Owners" subtitle="Ownership must remain exactly 100%" />
+      {!embedded && <PageHeader title="Partners / Owners" subtitle="Ownership must remain exactly 100%" />}
       <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Total ownership must remain exactly 100%. Current total: {totalPct.toFixed(2)}%</p>
       <DataTable
         data={rows}

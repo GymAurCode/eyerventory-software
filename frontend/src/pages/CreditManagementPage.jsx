@@ -71,7 +71,7 @@ function LedgerModal({ ledger, title, onClose }) {
   );
 }
 
-export default function CreditManagementPage() {
+export default function CreditManagementPage({ embedded = false }) {
   const [tab, setTab] = useState("customers");
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -169,15 +169,24 @@ export default function CreditManagementPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Credit Management"
-        subtitle="Track receivables and payables"
-        actions={
+      {!embedded && (
+        <PageHeader
+          title="Credit Management"
+          subtitle="Track receivables and payables"
+          actions={
+            <button className="btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
+              <Plus size={16} className="mr-1 inline" />New {isCustomer ? "Customer" : "Supplier"}
+            </button>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="mb-4 flex justify-end">
           <button className="btn-primary" onClick={() => { setEditing(null); setShowForm(true); }}>
             <Plus size={16} className="mr-1 inline" />New {isCustomer ? "Customer" : "Supplier"}
           </button>
-        }
-      />
+        </div>
+      )}
 
       <div className="mb-6 grid grid-cols-3 gap-4">
         <StatCard title={isCustomer ? "Total Customers" : "Total Suppliers"} value={rows.length} tone="indigo" />
