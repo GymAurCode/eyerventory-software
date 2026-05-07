@@ -27,6 +27,5 @@ faster-whisper
 apscheduler>=3.10,<4.0
 websockets>=12.0
 openpyxl>=3.1
-=======
 rapidfuzz==3.10.1
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
+
