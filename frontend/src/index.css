@@ -11,15 +11,9 @@
     --text-primary: #171717;
     --text-secondary: #52525b;
     --border-color: #e5e7eb;
-<<<<<<< HEAD
     /* Light theme: soft indigo — readable but not heavy */
     --accent: #4f52a8;
     --accent-hover: #5c5fbe;
-=======
-    /* Light theme: mid-range indigo — readable on white, not heavy */
-    --accent: #4f52a3;
-    --accent-hover: #5c5fb8;
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     --chart-grid: #d4d4d8;
     --tooltip-bg: #ffffff;
     --tooltip-border: #e4e4e7;
