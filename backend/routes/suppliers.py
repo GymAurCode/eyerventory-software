@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.credit import CreditAccount, Payment
+from backend.models.credit import CreditAccount, CreditPayment
 from backend.models.supplier import Supplier
 from backend.routes.deps import require_roles
 from backend.schemas.supplier import SupplierCreate, SupplierUpdate
@@ -29,9 +29,9 @@ def _enrich(supplier: Supplier, db: Session) -> dict:
 
     # Sum of all payments made against those credit accounts
     total_paid = db.query(
-        func.coalesce(func.sum(Payment.amount), 0)
+        func.coalesce(func.sum(CreditPayment.amount), 0)
     ).join(
-        CreditAccount, Payment.credit_account_id == CreditAccount.id
+        CreditAccount, CreditPayment.credit_account_id == CreditAccount.id
     ).filter(
         CreditAccount.party_type == "supplier",
         CreditAccount.party_id == supplier.id,

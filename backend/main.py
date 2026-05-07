@@ -10,45 +10,19 @@ except ImportError:
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-<<<<<<< HEAD
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from backend.core.security import get_password_hash
 from backend.database import Base, SessionLocal, engine
 from backend.ai.bootstrap import ensure_ai_seed_data
-=======
-from fastapi.responses import JSONResponse, Response
-
-from backend.database import Base, engine
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 from backend.initDb import apply_startup_migrations
+from backend.models.user import User
+from backend.models.owner_share import OwnerShare
 from backend.routes import (
-<<<<<<< HEAD
     accounting, ai, attendance, auth, credits, customers, employees, expenses,
-    finance, hr_payments, ledger, leaves, partners, payroll, products,
+    finance, hr_payments, ledger, leaves, partners, payments, payroll, products,
     purchases, reminders, reports, sales, settings, suppliers, users,
-=======
-    accounting,
-    attendance,
-    auth,
-    credit,
-    employees,
-    expenses,
-    finance,
-    hr_payments,
-    leaves,
-    partners,
-    payments,
-    payroll,
-    products,
-    purchases,
-    reports,
-    sales,
-    settings,
-    users,
-    ai_intelligence,
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -56,7 +30,6 @@ logger = logging.getLogger("inventory-api")
 
 app = FastAPI(title="Inventory API", version="1.0.0")
 
-<<<<<<< HEAD
 # ---------------------------------------------------------------------------
 # CORS — allow_origins=["*"] is required for WebSocket upgrades from Electron.
 # Electron sends Origin: null (file:// context) which CORSMiddleware rejects
@@ -68,29 +41,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-=======
-# CORS must be added before any middleware or exception handlers so that
-# error responses also carry the correct headers.
-CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "null"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_origin_regex=r"file://.*",
-    allow_credentials=True,
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 def _cors_headers(request: Request) -> dict:
-    """Return CORS headers matching the request origin so error responses aren't blocked."""
-    origin = request.headers.get("origin", "")
-    allowed = origin if origin in CORS_ORIGINS else (CORS_ORIGINS[0] if CORS_ORIGINS else "*")
+    """Return CORS headers for error responses."""
     return {
-        "Access-Control-Allow-Origin": allowed,
-        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Origin": "*",
     }
 
 
@@ -115,7 +74,6 @@ async def logging_middleware(request: Request, call_next):
         response = await call_next(request)
         logger.info("%s %s -> %s", request.method, request.url.path, response.status_code)
         return response
-<<<<<<< HEAD
     except Exception:
         import traceback as _tb
         _trace = _tb.format_exc()
@@ -149,6 +107,7 @@ app.include_router(attendance.router, prefix="/api")
 app.include_router(leaves.router,     prefix="/api")
 app.include_router(payroll.router,    prefix="/api")
 app.include_router(hr_payments.router,prefix="/api")
+app.include_router(payments.router,   prefix="/api")
 app.include_router(ai.router,         prefix="/api")
 app.include_router(reminders.router,  prefix="/api")
 
@@ -207,53 +166,3 @@ def on_startup():
 def on_shutdown():
     from backend.services.reminder_scheduler import stop_scheduler
     stop_scheduler()
-=======
-    except Exception as exc:
-        logger.exception("Unhandled middleware error")
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "message": str(exc)},
-            headers=_cors_headers(request),
-        )
-
-
-# ── Startup ───────────────────────────────────────────────────────────────────
-
-@app.on_event("startup")
-def on_startup():
-    # Run file-based migrations then seed default data
-    apply_startup_migrations()
-    # Create any tables still missing (safety net for models not yet in migrations)
-    Base.metadata.create_all(bind=engine)
-    # Dispose the connection pool so all subsequent requests get fresh connections
-    # that reflect the final schema — avoids stale "no such column" errors.
-    engine.dispose()
-
-
-# ── Routes ────────────────────────────────────────────────────────────────────
-
-app.include_router(auth.router, prefix="/api")
-app.include_router(products.router, prefix="/api")
-app.include_router(sales.router, prefix="/api")
-app.include_router(expenses.router, prefix="/api")
-app.include_router(finance.router, prefix="/api")
-app.include_router(accounting.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(partners.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
-app.include_router(purchases.router, prefix="/api")
-app.include_router(credit.router, prefix="/api")
-app.include_router(payments.router, prefix="/api")
-app.include_router(employees.router, prefix="/api")
-app.include_router(attendance.router, prefix="/api")
-app.include_router(leaves.router, prefix="/api")
-app.include_router(payroll.router, prefix="/api")
-app.include_router(hr_payments.router, prefix="/api")
-app.include_router(ai_intelligence.router, prefix="/api")
-
-
-@app.get("/api/health", tags=["health"])
-def health_check():
-    return {"status": "ok"}
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

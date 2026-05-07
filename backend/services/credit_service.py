@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.models.credit import CreditAccount, CreditItem, CreditTransaction, LedgerEntry, Payment
+from backend.models.credit import CreditAccount, CreditItem, CreditTransaction, LedgerEntry, CreditPayment
 from backend.models.customer import Customer
 from backend.models.product import Product
 from backend.models.sale import Sale
@@ -108,7 +108,7 @@ def create_credit_account(
                 reference_id=reference_id,
             )
         )
-        db.add(Payment(credit_account_id=account.id, amount=paid_amount, method="cash"))
+        db.add(CreditPayment(credit_account_id=account.id, amount=paid_amount, method="cash"))
 
     for item in items or []:
         product = db.query(Product).filter(Product.id == item["product_id"]).first()
@@ -183,7 +183,7 @@ def record_payment(db: Session, credit_account_id: int, amount: float, method: s
     if amount <= 0:
         raise ValueError("Payment amount must be greater than zero")
 
-    payment = Payment(credit_account_id=credit_account_id, amount=amount, method=method)
+    payment = CreditPayment(credit_account_id=credit_account_id, amount=amount, method=method)
     db.add(payment)
     db.add(
         CreditTransaction(
@@ -250,9 +250,9 @@ def get_credit_detail(db: Session, credit_id: int):
     )
     items = db.query(CreditItem).filter(CreditItem.credit_account_id == credit_id).all()
     payments = (
-        db.query(Payment)
-        .filter(Payment.credit_account_id == credit_id)
-        .order_by(Payment.id.desc())
+        db.query(CreditPayment)
+        .filter(CreditPayment.credit_account_id == credit_id)
+        .order_by(CreditPayment.id.desc())
         .all()
     )
     products = {p.id: p.name for p in db.query(Product.id, Product.name).filter(Product.id.in_([i.product_id for i in items])).all()}

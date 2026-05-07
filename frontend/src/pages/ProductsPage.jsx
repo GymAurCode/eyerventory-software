@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-import { useEffect, useMemo, useState } from "react";
-import { PackagePlus, Trash2 } from "lucide-react";
-=======
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
+import { PackagePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";

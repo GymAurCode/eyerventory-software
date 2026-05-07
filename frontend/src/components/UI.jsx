@@ -4,7 +4,6 @@ import { Edit3, Eye, Loader2, Trash2, X } from "lucide-react";
 import { formatPKR } from "../utils/currency";
 import { useTheme } from "../contexts/ThemeContext";
 
-<<<<<<< HEAD
 // Dark theme: dark tinted border + colored glow shadow (unchanged)
 // Light theme: clean white card + colored border + minimal neutral shadow
 const toneStyles = {
@@ -23,26 +22,6 @@ const toneStyles = {
   amber: {
     dark:  { border: "#3D3220", shadow: "0 0 0 1px #3D3220 inset, 0 8px 26px rgba(245,158,11,0.25)" },
     light: { border: "#f59e0b", shadow: "0 1px 4px rgba(0,0,0,0.08)" },
-=======
-// dark: subtle tinted border + colored glow (unchanged)
-// light: clean accent border color, no glow fill
-const toneStyles = {
-  indigo: {
-    dark:  { border: "#2A2D52", shadow: "0 0 0 1px #2A2D52 inset, 0 8px 26px rgba(99,102,241,0.25)" },
-    light: { border: "#6366F1", shadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  },
-  emerald: {
-    dark:  { border: "#1F3A2E", shadow: "0 0 0 1px #1F3A2E inset, 0 8px 26px rgba(34,197,94,0.25)" },
-    light: { border: "#22C55E", shadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  },
-  rose: {
-    dark:  { border: "#412325", shadow: "0 0 0 1px #412325 inset, 0 8px 26px rgba(239,68,68,0.25)" },
-    light: { border: "#EF4444", shadow: "0 1px 4px rgba(0,0,0,0.06)" },
-  },
-  amber: {
-    dark:  { border: "#3D3220", shadow: "0 0 0 1px #3D3220 inset, 0 8px 26px rgba(245,158,11,0.25)" },
-    light: { border: "#F59E0B", shadow: "0 1px 4px rgba(0,0,0,0.06)" },
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
   },
 };
 
@@ -88,7 +67,6 @@ export function StatCard({ title, value, tone = "indigo", money = false }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
       className="panel panel-hover"
-<<<<<<< HEAD
       style={{
         borderColor: cfg.border,
         borderWidth: "1px",
@@ -96,9 +74,6 @@ export function StatCard({ title, value, tone = "indigo", money = false }) {
         boxShadow: cfg.shadow,
         background: theme === "light" ? "var(--bg-card)" : undefined,
       }}
-=======
-      style={{ borderColor: cfg.border, boxShadow: cfg.shadow }}
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     >
       <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{title}</p>
       <p className="mt-2 text-xl font-semibold">

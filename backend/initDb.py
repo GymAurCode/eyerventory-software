@@ -10,6 +10,9 @@ imports in main.py continue to work without changes.
 
 import logging
 
+from sqlalchemy import text
+
+from backend.database import engine
 from backend.migrate import run_migrations
 from backend.seed import run_seeds
 
@@ -23,7 +26,6 @@ def apply_startup_migrations() -> None:
     Safe to call on a brand-new empty DB or an existing production DB.
     """
     try:
-<<<<<<< HEAD
         with engine.begin() as conn:
             # Users table migrations
             user_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
@@ -60,6 +62,12 @@ def apply_startup_migrations() -> None:
             if "category" not in product_columns:
                 logger.info("Adding 'category' column to products table")
                 conn.execute(text("ALTER TABLE products ADD COLUMN category VARCHAR(80)"))
+            if "selling_price" not in product_columns:
+                logger.info("Adding 'selling_price' column to products table")
+                conn.execute(text("ALTER TABLE products ADD COLUMN selling_price REAL NOT NULL DEFAULT 0.0"))
+            if "updated_at" not in product_columns:
+                logger.info("Adding 'updated_at' column to products table")
+                conn.execute(text("ALTER TABLE products ADD COLUMN updated_at DATETIME"))
             
             # Add more migrations here as needed
             # Example for sales table
@@ -305,17 +313,27 @@ def _apply_credit_management_migrations(conn):
             )
         )
 
-    if "payments" not in tables:
-        conn.execute(
-            text(
-                "CREATE TABLE payments ("
-                "id INTEGER PRIMARY KEY, "
-                "credit_account_id INTEGER NOT NULL, "
-                "amount FLOAT NOT NULL, "
-                "method VARCHAR(16) NOT NULL DEFAULT 'cash', "
-                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL)"
+    if "credit_payments" not in tables:
+        # Check if the old 'payments' table was actually the credit payments table
+        # (identified by having credit_account_id column instead of direction)
+        if "payments" in tables:
+            pay_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(payments)")).fetchall()]
+            if "credit_account_id" in pay_cols and "direction" not in pay_cols:
+                # This is the old misnamed credit payments table — rename it
+                logger.info("Renaming legacy 'payments' table to 'credit_payments'")
+                conn.execute(text("ALTER TABLE payments RENAME TO credit_payments"))
+            # else: payments table belongs to payment.py (direction-based), leave it alone
+        else:
+            conn.execute(
+                text(
+                    "CREATE TABLE credit_payments ("
+                    "id INTEGER PRIMARY KEY, "
+                    "credit_account_id INTEGER NOT NULL, "
+                    "amount FLOAT NOT NULL, "
+                    "method VARCHAR(16) NOT NULL DEFAULT 'cash', "
+                    "created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL)"
+                )
             )
-        )
 
     if "ledger_entries" not in tables:
         conn.execute(
@@ -352,6 +370,9 @@ def _apply_credit_management_migrations(conn):
             conn.execute(text("ALTER TABLE customers ADD COLUMN opening_balance FLOAT DEFAULT 0"))
         if "notes" not in customer_cols:
             conn.execute(text("ALTER TABLE customers ADD COLUMN notes VARCHAR(500)"))
+        if "balance" not in customer_cols:
+            conn.execute(text("ALTER TABLE customers ADD COLUMN balance REAL NOT NULL DEFAULT 0.0"))
+            logger.info("Added 'balance' column to customers table")
 
     if "suppliers" in tables:
         supplier_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(suppliers)")).fetchall()]
@@ -361,12 +382,15 @@ def _apply_credit_management_migrations(conn):
             conn.execute(text("ALTER TABLE suppliers ADD COLUMN opening_balance FLOAT DEFAULT 0"))
         if "notes" not in supplier_cols:
             conn.execute(text("ALTER TABLE suppliers ADD COLUMN notes VARCHAR(500)"))
+        if "balance" not in supplier_cols:
+            conn.execute(text("ALTER TABLE suppliers ADD COLUMN balance REAL NOT NULL DEFAULT 0.0"))
+            logger.info("Added 'balance' column to suppliers table")
 
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_credit_accounts_party ON credit_accounts(party_type, party_id)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_credit_accounts_status ON credit_accounts(status)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_credit_txn_account ON credit_transactions(credit_account_id, created_at)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_credit_items_account ON credit_items(credit_account_id)"))
-    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_payments_account ON payments(credit_account_id, created_at)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS idx_credit_payments_account ON credit_payments(credit_account_id, created_at)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_ledger_party ON ledger_entries(party_type, party_id, date)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS idx_suppliers_phone ON suppliers(phone)"))
@@ -418,16 +442,3 @@ def _apply_purchase_migrations(conn):
         logger.info("Created purchase_items table")
 
     logger.info("Purchase migrations applied")
-=======
-        run_migrations()
-    except Exception as exc:
-        logger.error("Migration runner failed: %s", exc)
-        raise
-
-    try:
-        run_seeds()
-    except Exception as exc:
-        # Seed failures are logged but do NOT crash the app —
-        # the app is still usable without default seed data.
-        logger.error("Seed runner failed (non-fatal): %s", exc)
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

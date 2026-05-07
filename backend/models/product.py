@@ -9,12 +9,7 @@ class Product(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(120), nullable=False, unique=True)
-<<<<<<< HEAD
     sku = Column(String(80), nullable=True, unique=True, index=True)
-=======
-    sku = Column(String(60), nullable=True, unique=True, index=True)
-    category = Column(String(60), nullable=True)
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     cost_price = Column(Float, nullable=False)
     selling_price = Column(Float, nullable=False, default=0.0)
     stock = Column(Integer, nullable=False, default=0)

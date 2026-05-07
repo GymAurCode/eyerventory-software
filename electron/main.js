@@ -61,7 +61,6 @@ const isDev = !app.isPackaged;
 let mainWindow;
 let backendManager;
 let licenseBackendManager;
-const isDev = !app.isPackaged;
 
 /* ---------------- WINDOW ---------------- */
 function createWindow() {

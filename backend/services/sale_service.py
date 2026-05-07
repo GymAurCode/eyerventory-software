@@ -15,12 +15,8 @@ from backend.models.customer import Customer
 from backend.models.product import Product
 from backend.models.sale import Sale
 from backend.schemas.sale import SaleCreate, SaleUpdate
-<<<<<<< HEAD
 from backend.services import accounting_service
 from backend.services.credit_service import create_credit_account
-=======
-from backend.services.accounting_service import create_journal_entry
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 
 
 def create_sale(db: Session, payload: SaleCreate):
@@ -62,7 +58,6 @@ def create_sale(db: Session, payload: SaleCreate):
         cost=cost,
         profit=profit,
         payment_type=payload.payment_type,
-<<<<<<< HEAD
         paid_amount=paid_amount,
         due_date=payload.due_date,
     )
@@ -94,44 +89,6 @@ def create_sale(db: Session, payload: SaleCreate):
         product_name=product.name,
     )
 
-=======
-        customer_id=payload.customer_id,
-    )
-    product.stock -= payload.quantity
-    db.add(sale)
-    db.flush()  # get sale.id
-
-    # Step 1: Revenue entry
-    dr_account = "Cash on Hand" if payload.payment_type == "cash" else "Accounts Receivable"
-    dr_type = "asset"
-    create_journal_entry(
-        db=db,
-        description=f"Sale #{sale.id} — Revenue ({payload.payment_type})",
-        entries=[
-            {"account_name": dr_account, "account_type": dr_type, "debit": revenue, "credit": 0.0},
-            {"account_name": "Sales Revenue", "account_type": "revenue", "debit": 0.0, "credit": revenue},
-        ],
-        reference_type="sale",
-        reference_id=sale.id,
-    )
-
-    # Step 2: COGS entry
-    create_journal_entry(
-        db=db,
-        description=f"Sale #{sale.id} — COGS",
-        entries=[
-            {"account_name": "Cost of Goods Sold", "account_type": "expense", "debit": cost, "credit": 0.0},
-            {"account_name": "Inventory", "account_type": "asset", "debit": 0.0, "credit": cost},
-        ],
-        reference_type="sale_cogs",
-        reference_id=sale.id,
-    )
-
-    # Update customer receivable balance for credit sales
-    if payload.payment_type == "credit" and customer:
-        customer.balance += revenue
-
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     db.commit()
     db.refresh(sale)
     return sale
@@ -162,16 +119,12 @@ def update_sale(db: Session, sale_id: int, payload: SaleUpdate):
     customer_id = payload.customer_id if payload.customer_id is not None else sale.customer_id
     if product.stock < quantity:
         raise ValueError("Insufficient stock")
-<<<<<<< HEAD
     if payment_type == "CREDIT" and not customer_id:
         raise ValueError("Customer is required for credit sale")
     if customer_id:
         customer = db.query(Customer).filter(Customer.id == customer_id).first()
         if not customer:
             raise ValueError("Customer not found")
-=======
-
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     sale.quantity = quantity
     sale.customer_id = customer_id
     sale.selling_price = selling_price

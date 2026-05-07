@@ -30,15 +30,9 @@
     --text-primary: #e5e5e5;
     --text-secondary: #a1a1aa;
     --border-color: #1f1f1f;
-<<<<<<< HEAD
     /* Dark theme: lifted indigo — brighter than before, more readable on dark bg */
     --accent: #4a4d8f;
     --accent-hover: #5a5ea8;
-=======
-    /* Dark theme: lighter indigo so buttons aren't near-black on dark bg */
-    --accent: #4f52a3;
-    --accent-hover: #5c5fb8;
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
     --chart-grid: #27272a;
     --tooltip-bg: #101010;
     --tooltip-border: #262626;

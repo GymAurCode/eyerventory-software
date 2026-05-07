@@ -3,12 +3,47 @@ import api from "../api/client";
 import { PageHeader, StatCard } from "../components/UI";
 import { formatPKR } from "../utils/currency";
 import ChartOfAccountsPage from "./ChartOfAccountsPage";
-import CreditManagementPage from "./CreditManagementPage";
 import PaymentsPage from "./PaymentsPage";
+import PurchasesPage from "./PurchasesPage";
 
 const TABS = ["summary", "pnl", "balance-sheet"];
 
 const TAB_LABELS = { summary: "Summary", pnl: "Profit & Loss", "balance-sheet": "Balance Sheet" };
+
+function BreakdownList({ items = {}, tone = "indigo" }) {
+  const color = tone === "emerald" ? "text-emerald-400" : tone === "rose" ? "text-rose-400" : "text-indigo-400";
+  const entries = Object.entries(items);
+  if (!entries.length) return <p className="text-sm" style={{ color: "var(--text-secondary)" }}>No data</p>;
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([label, amount]) => (
+        <div key={label} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
+          <span style={{ color: "var(--text-secondary)" }}>{label}</span>
+          <span className={`font-semibold ${color}`}>{formatPKR(amount)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TotalRow({ label, value }) {
+  return (
+    <div className="flex justify-between border-t pt-2 text-sm font-semibold" style={{ borderColor: "var(--border-color)" }}>
+      <span>{label}</span>
+      <span>{formatPKR(value)}</span>
+    </div>
+  );
+}
+
+function Section({ title, items = {}, tone, total }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{title}</p>
+      <BreakdownList items={items} tone={tone} />
+      <TotalRow label={`Total ${title}`} value={total} />
+    </div>
+  );
+}
 
 export default function FinancePage() {
   const [tab, setTab] = useState("summary");
@@ -36,24 +71,19 @@ export default function FinancePage() {
 
   if (loading) return (
     <div className="space-y-5">
-<<<<<<< HEAD
       <PageHeader title="Finance" subtitle="Overview, accounts, credit, and payments" />
-=======
-      <PageHeader title="Finance" subtitle="Journal-based financial reports" />
->>>>>>> 46e9926520814fb4499ac2438f234e1b68d13f85
       <div className="panel">Loading...</div>
     </div>
   );
 
   return (
-<<<<<<< HEAD
     <div className="space-y-6">
       <PageHeader title="Finance" subtitle="Overview, accounts, credit, and payments" />
       <div className="flex gap-1 rounded-lg border p-1" style={{ borderColor: "var(--border-color)", background: "var(--bg-elevated)", width: "fit-content" }}>
         {[
           { id: "overview", label: "Overview" },
           { id: "coa", label: "Chart of Accounts" },
-          { id: "credit", label: "Credit Management" },
+          { id: "purchases", label: "Purchases" },
           { id: "payments", label: "Payments" },
         ].map((tab) => (
           <button
@@ -72,14 +102,10 @@ export default function FinancePage() {
       </div>
 
       {activeTab === "coa" && <ChartOfAccountsPage embedded />}
-      {activeTab === "credit" && <CreditManagementPage embedded />}
+      {activeTab === "purchases" && <PurchasesPage embedded />}
       {activeTab === "payments" && <PaymentsPage embedded />}
       {activeTab !== "overview" ? null : (
         <>
-=======
-    <div className="space-y-5">
-      <PageHeader title="Finance" subtitle="Journal-based financial reports" />
->>>>>>> 46e9926520814fb4499ac2438f234e1b68d13f85
 
       {/* Stat cards — always visible */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -158,79 +184,41 @@ export default function FinancePage() {
             </p>
           </div>
         </div>
-<<<<<<< HEAD
-      </div>
+      )}
 
       {/* Full P&L breakdown */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {Object.keys(pnl.expense_breakdown).length > 0 && (
-          <div className="panel">
-            <p className="mb-3 font-semibold">Expense Detail</p>
-            <div className="space-y-2">
-              {Object.entries(pnl.expense_breakdown).map(([account, amount]) => (
-                <div key={account} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
-                  <span style={{ color: "var(--text-secondary)" }}>{account}</span>
-                  <span className="font-semibold text-rose-400">{formatPKR(amount)}</span>
-                </div>
-              ))}
+      {tab === "pnl" && pnl && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {Object.keys(pnl.expense_breakdown).length > 0 && (
+            <div className="panel">
+              <p className="mb-3 font-semibold">Expense Detail</p>
+              <div className="space-y-2">
+                {Object.entries(pnl.expense_breakdown).map(([account, amount]) => (
+                  <div key={account} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>{account}</span>
+                    <span className="font-semibold text-rose-400">{formatPKR(amount)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {Object.keys(pnl.revenue_breakdown).length > 0 && (
-          <div className="panel">
-            <p className="mb-3 font-semibold">Revenue Detail</p>
-            <div className="space-y-2">
-              {Object.entries(pnl.revenue_breakdown).map(([account, amount]) => (
-                <div key={account} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
-                  <span style={{ color: "var(--text-secondary)" }}>{account}</span>
-                  <span className="font-semibold text-emerald-400">{formatPKR(amount)}</span>
-                </div>
-              ))}
+          )}
+          {Object.keys(pnl.revenue_breakdown).length > 0 && (
+            <div className="panel">
+              <p className="mb-3 font-semibold">Revenue Detail</p>
+              <div className="space-y-2">
+                {Object.entries(pnl.revenue_breakdown).map(([account, amount]) => (
+                  <div key={account} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
+                    <span style={{ color: "var(--text-secondary)" }}>{account}</span>
+                    <span className="font-semibold text-emerald-400">{formatPKR(amount)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
         </>
       )}
-=======
-      )}
-    </div>
-  );
-}
-
-function BreakdownList({ items, tone }) {
-  const colors = { emerald: "text-emerald-400", rose: "text-rose-400", indigo: "text-indigo-400", amber: "text-amber-400" };
-  return (
-    <div className="space-y-1.5">
-      {Object.entries(items).map(([name, amount]) => (
-        <div key={name} className="flex justify-between rounded-lg px-3 py-2 text-sm" style={{ background: "var(--bg-elevated)" }}>
-          <span style={{ color: "var(--text-secondary)" }}>{name}</span>
-          <span className={`font-semibold ${colors[tone] ?? ""}`}>{formatPKR(amount)}</span>
-        </div>
-      ))}
-      {Object.keys(items).length === 0 && (
-        <p className="text-sm px-3" style={{ color: "var(--text-secondary)" }}>No entries yet</p>
-      )}
-    </div>
-  );
-}
-
-function Section({ title, items, tone, total }) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>{title}</p>
-      <BreakdownList items={items} tone={tone} />
-      <TotalRow label={`Total ${title}`} value={total} />
-    </div>
-  );
-}
-
-function TotalRow({ label, value }) {
-  return (
-    <div className="flex justify-between rounded-lg border px-3 py-2 text-sm font-semibold" style={{ borderColor: "var(--border-color)" }}>
-      <span>{label}</span>
-      <span>{formatPKR(value)}</span>
->>>>>>> 46e9926520814fb4499ac2438f234e1b68d13f85
     </div>
   );
 }

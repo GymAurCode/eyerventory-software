@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models.credit import CreditAccount, Payment
+from backend.models.credit import CreditAccount, CreditPayment
 from backend.models.customer import Customer
 from backend.routes.deps import require_roles
 from backend.schemas.customer import CustomerCreate, CustomerUpdate
@@ -27,9 +27,9 @@ def _enrich(customer: Customer, db: Session) -> dict:
     ).scalar() or 0.0
 
     total_paid = db.query(
-        func.coalesce(func.sum(Payment.amount), 0)
+        func.coalesce(func.sum(CreditPayment.amount), 0)
     ).join(
-        CreditAccount, Payment.credit_account_id == CreditAccount.id
+        CreditAccount, CreditPayment.credit_account_id == CreditAccount.id
     ).filter(
         CreditAccount.party_type == "customer",
         CreditAccount.party_id == customer.id,

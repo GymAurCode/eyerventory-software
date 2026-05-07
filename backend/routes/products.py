@@ -1,25 +1,17 @@
-<<<<<<< HEAD
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-=======
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.routes.deps import require_roles
 from backend.schemas.product import (
-<<<<<<< HEAD
     ImportSummary,
     ProductAddStock,
     ProductCreate,
     ProductRead,
     ProductUpdate,
-=======
-    BulkImportResult, ProductAddStock, ProductCreate, ProductRead, ProductUpdate,
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a
 )
 from backend.services import product_service
 from backend.services.import_service import (
@@ -77,7 +69,6 @@ def add_stock(product_id: int, payload: ProductAddStock, db: Session = Depends(g
     return product
 
 
-<<<<<<< HEAD
 # ---------------------------------------------------------------------------
 # Excel Import
 # ---------------------------------------------------------------------------
@@ -129,51 +120,3 @@ async def import_products_endpoint(
         return import_products(db, content)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-=======
-# ── Bulk import ───────────────────────────────────────────────────────────────
-
-@router.get("/bulk-import/template")
-def download_template(_=Depends(require_roles("owner"))):
-    """Return a pre-filled .xlsx template for bulk product import."""
-    try:
-        data = product_service.generate_template_bytes()
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return Response(
-        content=data,
-        media_type=_XLSX_MIME,
-        headers={"Content-Disposition": "attachment; filename=products_import_template.xlsx"},
-    )
-
-
-@router.post("/bulk-import", response_model=BulkImportResult)
-async def bulk_import(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    _=Depends(require_roles("owner")),
-):
-    """
-    Upload an .xlsx file to bulk-create or update products.
-    - SKU match → UPDATE existing product
-    - No SKU match → CREATE new product
-    """
-    if not file.filename or not file.filename.lower().endswith(".xlsx"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only .xlsx files are accepted. Please use the provided template.",
-        )
-
-    file_bytes = await file.read()
-    if len(file_bytes) > 5 * 1024 * 1024:  # 5 MB guard
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large (max 5 MB).")
-
-    try:
-        result = product_service.bulk_import_products(db, file_bytes)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except Exception as exc:
-        logger.error("bulk_import failed: %s", exc)
-        raise HTTPException(status_code=500, detail="Import failed due to a server error.") from exc
-
-    return result
->>>>>>> a9021499fc116a37fb0466bd4381e05a1186f38a

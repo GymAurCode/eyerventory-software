@@ -59,10 +59,10 @@ class CreditItem(Base):
     total = Column(Float, nullable=False)
 
 
-class Payment(Base):
-    __tablename__ = "payments"
+class CreditPayment(Base):
+    __tablename__ = "credit_payments"
     __table_args__ = (
-        CheckConstraint("method IN ('cash','bank')", name="ck_payments_method"),
+        CheckConstraint("method IN ('cash','bank')", name="ck_credit_payments_method"),
     )
 
     id = Column(Integer, primary_key=True, index=True)

@@ -9,7 +9,6 @@ const path = require("path");
 const fs = require("fs");
 const http = require("http");
 const net = require("net");
-const getPort = require("get-port");
 const log = require("electron-log");
 
 class BackendManager {
@@ -24,41 +23,29 @@ class BackendManager {
   }
 
   /**
-   * Check if a port is in use
+   * Check if a specific port is free by attempting to bind to it.
    */
-  async isPortInUse(port, host = this.backendHost) {
+  isPortFree(port, host = this.backendHost) {
     return new Promise((resolve) => {
       const server = net.createServer();
-      server.once("error", (err) => {
-        if (err.code === "EADDRINUSE") {
-          resolve(true);
-        } else {
-          log.warn(`[backend-manager] port check error on ${host}:${port}:`, err.message);
-          resolve(false);
-        }
-      });
-      server.once("listening", () => {
-        server.close(() => resolve(false));
-      });
+      server.once("error", () => resolve(false));
+      server.once("listening", () => server.close(() => resolve(true)));
       server.listen(port, host);
     });
   }
 
   /**
-   * Find an available port in the configured range
+   * Scan portRange and return the first free port. Pure net — no extra deps.
    */
   async findAvailablePort() {
-    try {
-      const port = await getPort({
-        port: getPort.makeRange(this.portRange.min, this.portRange.max),
-        host: this.backendHost,
-      });
-      log.info(`[backend-manager] found available port: ${port}`);
-      return port;
-    } catch (err) {
-      log.error(`[backend-manager] failed to find available port:`, err.message);
-      throw new Error(`No available ports in range ${this.portRange.min}-${this.portRange.max}`);
+    const { min, max } = this.portRange;
+    for (let port = min; port <= max; port++) {
+      if (await this.isPortFree(port)) {
+        log.info(`[backend-manager] found available port: ${port}`);
+        return port;
+      }
     }
+    throw new Error(`No available ports in range ${min}-${max}`);
   }
 
   /**
@@ -327,9 +314,9 @@ class BackendManager {
         // Try to clean up stale processes
         await this.killStaleProcesses(port);
 
-        // Verify port is actually free
-        const portInUse = await this.isPortInUse(port);
-        if (portInUse) {
+        // Verify port is actually free after cleanup
+        const portFree = await this.isPortFree(port);
+        if (!portFree) {
           log.warn(`[backend-manager] port ${port} still in use after cleanup, finding another`);
           continue;
         }
