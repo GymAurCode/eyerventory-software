@@ -279,12 +279,14 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Start license backend (non-blocking)
+  // Start license backend (dev only — production uses Railway directly)
   const licenseResult = licenseBackendManager.start();
-  if (licenseResult.success) {
-    log.info(`[app] license service started on port ${licenseResult.port}`);
+  if (licenseResult.mode === "remote") {
+    log.info("[app] license: using Railway remote server (production mode)");
+  } else if (licenseResult.success) {
+    log.info(`[app] license service started locally on port ${licenseResult.port}`);
   } else {
-    log.warn(`[app] license service failed to start: ${licenseResult.reason}`);
+    log.info(`[app] license service not started (${licenseResult.reason}) — will use Railway`);
   }
 
   // ── LICENSE CHECK (runs before window loads) ──────────────────────────────
@@ -443,8 +445,12 @@ ipcMain.handle("license:check", () => {
 
 ipcMain.handle("license:activate", async (_event, licenseKey) => {
   const userDataDir = app.getPath("userData");
-  const result = await licenseService.activateLicense(userDataDir, licenseKey);
-  log.info("[license:activate]", result.ok ? "success" : result.error);
+  const result = await licenseService.activateLicense(userDataDir, licenseKey, app.isPackaged);
+  if (result.ok) {
+    log.info("[license:activate] activation success");
+  } else {
+    log.warn("[license:activate] activation failed:", result.error);
+  }
   return result;
 });
 
