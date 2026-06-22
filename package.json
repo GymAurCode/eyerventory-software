@@ -59,13 +59,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "certificateFile": null,
-      "certificatePassword": null,
-      "signingHashAlgorithms": [
-        "sha256"
-      ],
-      "sign": null
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
