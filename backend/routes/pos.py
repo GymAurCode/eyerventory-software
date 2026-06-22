@@ -17,6 +17,7 @@ from backend.schemas.pos import (
     SaleReturnCreate,
     SaleReturnRead,
 )
+from backend.services import accounting_service
 from backend.utils.activity import log_activity
 from backend.utils.barcode import generate_barcode
 
@@ -140,6 +141,7 @@ def create_pos_sale(payload: PosSaleCreate, db: Session = Depends(get_db), _=Dep
     db.add(sale)
     db.flush()
 
+    acct_items = []
     for item_dict, item in zip(items_data, payload.items):
         db.add(PosSaleItem(
             sale_id=sale.id,
@@ -151,6 +153,20 @@ def create_pos_sale(payload: PosSaleCreate, db: Session = Depends(get_db), _=Dep
         ))
         # Reduce stock
         item_dict["product"].stock -= item.qty
+        acct_items.append({
+            "cost_price": item_dict["product"].cost_price,
+            "qty": item.qty,
+        })
+
+    # Create double-entry journal entry for the POS sale
+    accounting_service.record_pos_sale(
+        db,
+        sale_id=sale.id,
+        bill_number=bill_number,
+        total=payload.total,
+        payment_method=payload.payment_method,
+        items=acct_items,
+    )
 
     db.commit()
     db.refresh(sale)
@@ -215,8 +231,8 @@ def return_pos_sale(sale_id: int, payload: SaleReturnCreate, db: Session = Depen
 
         # Restore stock
         product = db.query(Product).filter(Product.id == ri.item_id).first()
-        if product:
-            product.stock += ri.qty
+        product.stock += ri.qty
+        return_items[-1]["cost_price"] = product.cost_price
 
     sale_return = SaleReturn(
         sale_id=sale.id,
@@ -229,7 +245,7 @@ def return_pos_sale(sale_id: int, payload: SaleReturnCreate, db: Session = Depen
     for ri in return_items:
         db.add(SaleReturnItem(
             return_id=sale_return.id,
-            **ri,
+            **{k: v for k, v in ri.items() if k != "cost_price"},
         ))
 
     # Update sale status
@@ -238,6 +254,17 @@ def return_pos_sale(sale_id: int, payload: SaleReturnCreate, db: Session = Depen
         for si in sale.items
     )
     sale.status = "returned" if all_returned else "partial_return"
+
+    # Create reverse journal entry for the return
+    accounting_service.record_pos_return(
+        db,
+        sale_id=sale.id,
+        return_id=sale_return.id,
+        bill_number=sale.bill_number,
+        total_refund=total_refund,
+        original_payment_method=sale.payment_method,
+        items=[{"cost_price": ri["cost_price"], "qty": ri["qty"]} for ri in return_items],
+    )
 
     db.commit()
     db.refresh(sale_return)

@@ -405,10 +405,16 @@ export default function ProductsPage() {
       key: "actions",
       label: "Actions",
       align: "right",
-      render: (row) => Number(row.stock || 0) === 0 ? (
+      render: (row) => (
         <div className="flex justify-end gap-1">
           <button className="icon-btn icon-btn-view" onClick={() => openAddStock(row)} disabled={role !== "owner"} title="Add Stock">
             <i className="ti ti-package-plus" style={{ fontSize: "16px" }} />
+          </button>
+          <button className="icon-btn icon-btn-view" onClick={() => { setSelected(row); setViewOpen(true); }} title="View">
+            <i className="ti ti-eye" style={{ fontSize: "16px" }} />
+          </button>
+          <button className="icon-btn icon-btn-edit" onClick={() => openEdit(row)} disabled={role !== "owner"} title="Edit">
+            <i className="ti ti-pencil" style={{ fontSize: "16px" }} />
           </button>
           <button className="icon-btn icon-btn-view" onClick={() => {
             const bcNum = row.barcode_number;
@@ -440,25 +446,6 @@ export default function ProductsPage() {
             <i className="ti ti-trash" style={{ fontSize: "16px" }} />
           </button>
         </div>
-      ) : (
-        <ActionButtons
-          onView={() => { setSelected(row); setViewOpen(true); }}
-          onEdit={() => openEdit(row)}
-          onPrint={() => printRecord({
-            title: "Product Details",
-            fields: [
-              { label: "Name", value: row.name },
-              { label: "SKU", value: row.sku || "—" },
-              { label: "Stock", value: row.stock },
-              { label: "Cost Price", value: formatPKR(row.cost_price) },
-              { label: "Selling Price", value: formatPKR(row.selling_price) },
-              { label: "Category", value: row.category || "—" },
-            ],
-          })}
-          onDelete={() => setDeleting(row)}
-          disableEdit={role !== "owner"}
-          disableDelete={role !== "owner"}
-        />
       ),
     },
   ];

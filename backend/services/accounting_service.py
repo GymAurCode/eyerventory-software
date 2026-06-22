@@ -177,6 +177,113 @@ def record_sale(
     )
 
 
+def _journal_exists(db: Session, ref_type: str, ref_id: int) -> bool:
+    """Check if a journal entry already exists for the given reference."""
+    return db.query(JournalEntry).filter(
+        JournalEntry.reference_type == ref_type,
+        JournalEntry.reference_id == ref_id,
+    ).first() is not None
+
+
+def record_pos_sale(
+    db: Session,
+    sale_id: int,
+    bill_number: str,
+    total: float,
+    payment_method: str,
+    items: list[dict],
+) -> JournalEntry:
+    """
+    POS multi-item sale — double-entry journal.
+
+    Payment-method mapping:
+        cash  → DR Cash on Hand / CR Sales Revenue
+        card  → DR Bank          / CR Sales Revenue
+        other → DR Cash on Hand  / CR Sales Revenue
+
+    Always:
+        DR Cost of Goods Sold  / CR Inventory
+
+    Each items dict: {"cost_price": float, "qty": int}
+    """
+    if _journal_exists(db, "pos_sale", sale_id):
+        raise ValueError(f"Journal entry already exists for POS sale #{sale_id}")
+
+    if payment_method == "card":
+        debit_account = ("Bank", "asset")
+    else:
+        debit_account = ("Cash on Hand", "asset")
+
+    total_cost = sum(float(i["cost_price"]) * int(i["qty"]) for i in items)
+
+    entries = [
+        {"account_name": debit_account[0], "account_type": debit_account[1],
+         "debit": total, "credit": 0.0},
+        {"account_name": "Sales Revenue", "account_type": "revenue",
+         "debit": 0.0, "credit": total},
+        {"account_name": "Cost of Goods Sold", "account_type": "expense",
+         "debit": total_cost, "credit": 0.0},
+        {"account_name": "Inventory", "account_type": "asset",
+         "debit": 0.0, "credit": total_cost},
+    ]
+    return create_journal_entry(
+        db,
+        f"POS Sale — {bill_number}",
+        entries,
+        reference_type="pos_sale",
+        reference_id=sale_id,
+    )
+
+
+def record_pos_return(
+    db: Session,
+    sale_id: int,
+    return_id: int,
+    bill_number: str,
+    total_refund: float,
+    original_payment_method: str,
+    items: list[dict],
+) -> JournalEntry:
+    """
+    Reverse journal entry for a POS return/refund.
+
+    Reverses both revenue and COGS sides:
+        DR Sales Revenue              total_refund
+        CR Cash on Hand / Bank        total_refund
+        DR Inventory                  total_cost
+        CR Cost of Goods Sold         total_cost
+
+    Each items dict: {"cost_price": float, "qty": int}
+    """
+    if _journal_exists(db, "pos_return", return_id):
+        raise ValueError(f"Journal entry already exists for POS return #{return_id}")
+
+    if original_payment_method == "card":
+        credit_account = ("Bank", "asset")
+    else:
+        credit_account = ("Cash on Hand", "asset")
+
+    total_cost = sum(float(i["cost_price"]) * int(i["qty"]) for i in items)
+
+    entries = [
+        {"account_name": "Sales Revenue", "account_type": "revenue",
+         "debit": total_refund, "credit": 0.0},
+        {"account_name": credit_account[0], "account_type": credit_account[1],
+         "debit": 0.0, "credit": total_refund},
+        {"account_name": "Inventory", "account_type": "asset",
+         "debit": total_cost, "credit": 0.0},
+        {"account_name": "Cost of Goods Sold", "account_type": "expense",
+         "debit": 0.0, "credit": total_cost},
+    ]
+    return create_journal_entry(
+        db,
+        f"POS Return — {bill_number}",
+        entries,
+        reference_type="pos_return",
+        reference_id=return_id,
+    )
+
+
 def record_customer_payment(
     db: Session,
     sale_id: int,
