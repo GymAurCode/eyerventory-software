@@ -4,8 +4,8 @@ const fs = require("fs");
 
 // Resolve Python from the local venv (works on any machine)
 const projectRoot = path.join(__dirname, "..");
-const pythonWin = path.join(projectRoot, "venv", "Scripts", "python.exe");
-const pythonUnix = path.join(projectRoot, "venv", "bin", "python");
+const pythonWin = path.join(projectRoot, ".venv", "Scripts", "python.exe");
+const pythonUnix = path.join(projectRoot, ".venv", "bin", "python");
 const python = fs.existsSync(pythonWin) ? pythonWin : pythonUnix;
 
 if (!fs.existsSync(python)) {
