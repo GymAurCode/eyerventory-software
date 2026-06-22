@@ -7,10 +7,10 @@
   "license": "MIT",
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev:backend": "venv\\Scripts\\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
+    "dev:backend": ".venv\\Scripts\\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
     "dev:electron": "cross-env NODE_ENV=development electron .",
-    "dev": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND -c cyan,magenta \"npm run dev:backend\" \"wait-on http://127.0.0.1:8000/api/health && npm run dev:frontend\"",
-    "electron": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND,ELECTRON -c cyan,magenta,yellow \"npm run dev:backend\" \"wait-on http://127.0.0.1:8000/api/health && npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
+    "dev": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND -c cyan,magenta \"npm run dev:backend\" \"wait-on http-get://127.0.0.1:8000/api/health && npm run dev:frontend\"",
+    "electron": "concurrently --kill-others-on-fail -n BACKEND,FRONTEND,ELECTRON -c cyan,magenta,yellow \"npm run dev:backend\" \"wait-on http-get://127.0.0.1:8000/api/health && npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "node scripts/build-backend.js",
     "ai:check": "python scripts/run-ai-checks.py",
@@ -19,12 +19,13 @@
   },
   "dependencies": {
     "electron-log": "^5.4.3",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "node-thermal-printer": "^4.6.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron": "^35.1.5",
+    "electron": "^42.4.1",
     "electron-builder": "^25.1.8",
     "wait-on": "^8.0.3"
   },

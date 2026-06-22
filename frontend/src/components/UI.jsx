@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Edit3, Eye, Loader2, Trash2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { formatPKR } from "../utils/currency";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -56,9 +56,11 @@ function CountUpValue({ value, duration = 0.8, formatter = (v) => v }) {
   return formatter(display);
 }
 
-export function StatCard({ title, value, tone = "indigo", money = false }) {
+export function StatCard({ title, value, icon, color, trend, trendUp, tone = "indigo", money = false }) {
   const { theme } = useTheme();
+  const isDark = theme === "dark";
   const cfg = (toneStyles[tone] || toneStyles.indigo)[theme] ?? (toneStyles[tone] || toneStyles.indigo).dark;
+  const iconColor = color || cfg.border;
   const formatter = useMemo(() => (money ? (val) => formatPKR(Math.round(val)) : (val) => Math.round(val).toLocaleString()), [money]);
 
   return (
@@ -66,19 +68,35 @@ export function StatCard({ title, value, tone = "indigo", money = false }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28 }}
-      className="panel panel-hover"
+      className="rounded-xl p-4 transition-all"
       style={{
-        borderColor: cfg.border,
-        borderWidth: "1px",
-        borderStyle: "solid",
-        boxShadow: cfg.shadow,
-        background: theme === "light" ? "var(--bg-card)" : undefined,
+        background: isDark ? "#0d2020" : "#ffffff",
+        border: "0.5px solid",
+        borderColor: isDark ? "rgba(0,128,128,0.22)" : "#c0d8d8",
       }}
     >
-      <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{title}</p>
-      <p className="mt-2 text-xl font-semibold">
-        <CountUpValue value={value} formatter={formatter} />
-      </p>
+      <div className="flex items-center gap-3">
+        {icon && (
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg shrink-0"
+            style={{ background: iconColor + (isDark ? "22" : "11") }}
+          >
+            <i className={`ti ${icon}`} style={{ fontSize: "18px", color: iconColor }} />
+          </div>
+        )}
+        <div className={icon ? "min-w-0" : "w-full"}>
+          <p className="text-lg font-semibold truncate" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>
+            <CountUpValue value={value} formatter={formatter} />
+          </p>
+          <p className="text-[11px] truncate" style={{ color: "var(--text-secondary)" }}>{title}</p>
+        </div>
+      </div>
+      {trend && (
+        <div className="mt-3 flex items-center gap-1 text-[10px] font-medium" style={{ color: trendUp ? "#22c55e" : "#ef4444" }}>
+          <i className={`ti ${trendUp ? "ti-trending-up" : "ti-trending-down"}`} style={{ fontSize: "12px" }} />
+          {trend}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -127,32 +145,28 @@ export function LoadingSkeleton({ rows = 5 }) {
   );
 }
 
-export function ActionButtons({ onView, onEdit, onDelete, disableEdit = false, disableDelete = false }) {
+export function ActionButtons({ onView, onEdit, onPrint, onDelete, disableEdit = false, disableDelete = false }) {
   return (
-    <div className="flex justify-end gap-1.5">
+    <div className="flex justify-end gap-1">
       {onView && (
-        <div className="tooltip-wrap">
-          <button className="icon-btn icon-btn-view" onClick={onView} aria-label="View Details">
-            <Eye size={15} />
-          </button>
-          <span className="tooltip-text">View Details</span>
-        </div>
+        <button className="icon-btn icon-btn-view" onClick={onView} title="View Details">
+          <i className="ti ti-eye" style={{ fontSize: "16px" }} />
+        </button>
       )}
       {onEdit && (
-        <div className="tooltip-wrap">
-          <button className="icon-btn icon-btn-edit" onClick={onEdit} aria-label="Edit Record" disabled={disableEdit}>
-            <Edit3 size={15} />
-          </button>
-          <span className="tooltip-text">Edit Record</span>
-        </div>
+        <button className="icon-btn icon-btn-edit" onClick={onEdit} title="Edit Record" disabled={disableEdit}>
+          <i className="ti ti-edit" style={{ fontSize: "16px" }} />
+        </button>
+      )}
+      {onPrint && (
+        <button className="icon-btn icon-btn-print" onClick={onPrint} title="Print">
+          <i className="ti ti-printer" style={{ fontSize: "16px" }} />
+        </button>
       )}
       {onDelete && (
-        <div className="tooltip-wrap">
-          <button className="icon-btn icon-btn-danger" onClick={onDelete} aria-label="Delete Record" disabled={disableDelete}>
-            <Trash2 size={15} />
-          </button>
-          <span className="tooltip-text">Delete Record</span>
-        </div>
+        <button className="icon-btn icon-btn-danger" onClick={onDelete} title="Delete Record" disabled={disableDelete}>
+          <i className="ti ti-trash" style={{ fontSize: "16px" }} />
+        </button>
       )}
     </div>
   );
@@ -243,10 +257,12 @@ export function DataTable({
       </div>
       <div className="overflow-x-auto">
         <table className="data-table w-full text-sm">
-          <thead>
+            <thead>
             <tr>
               {columns.map((col) => (
-                <th key={col.key} className={`px-4 py-3 ${col.align === "right" ? "text-right" : "text-left"}`}>{col.label}</th>
+                <th key={col.key} className={`px-4 py-3 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                  {typeof col.headerRender === "function" ? col.headerRender() : col.label}
+                </th>
               ))}
             </tr>
           </thead>

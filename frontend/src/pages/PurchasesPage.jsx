@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, X, ChevronDown, Eye } from "lucide-react";
+import { Plus, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import api from "../api/client";
 import { purchasesApi } from "../api/purchases";
 import { PageHeader } from "../components/UI";
 import { formatPKR } from "../utils/currency";
+import { printRecord } from "../utils/print";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -459,12 +460,26 @@ export default function PurchasesPage({ embedded = false }) {
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{formatPKR(p.final_amount)}</td>
                   <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => setDetail(p)} className="rounded p-1.5 hover:bg-[var(--bg-elevated)]" title="View details">
-                        <Eye size={14} />
+                    <div className="flex items-center justify-center gap-1">
+                      <button className="icon-btn icon-btn-view" onClick={() => setDetail(p)} title="View Details">
+                        <i className="ti ti-eye" style={{ fontSize: "16px" }} />
                       </button>
-                      <button onClick={() => handleDelete(p.id)} className="rounded p-1.5 hover:bg-red-500/10 text-red-400" title="Delete">
-                        <Trash2 size={14} />
+                      <button className="icon-btn icon-btn-print" onClick={() => printRecord({
+                        title: "Purchase Details",
+                        fields: [
+                          { label: "Product", value: p.product_name || `#${p.product_id}` },
+                          { label: "Quantity", value: p.quantity },
+                          { label: "Unit Price", value: formatPKR(p.unit_price || 0) },
+                          { label: "Final Amount", value: formatPKR(p.final_amount || 0) },
+                          { label: "Payment Type", value: p.payment_type || "N/A" },
+                          { label: "Supplier", value: p.supplier_name || "—" },
+                          { label: "Date", value: p.created_at ? new Date(p.created_at).toLocaleString() : "N/A" },
+                        ],
+                      })} title="Print">
+                        <i className="ti ti-printer" style={{ fontSize: "16px" }} />
+                      </button>
+                      <button className="icon-btn icon-btn-danger" onClick={() => handleDelete(p.id)} title="Delete Record">
+                        <i className="ti ti-trash" style={{ fontSize: "16px" }} />
                       </button>
                     </div>
                   </td>

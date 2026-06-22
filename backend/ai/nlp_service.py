@@ -48,7 +48,7 @@ def _rule_based_sql(question: str) -> str:
         return "SELECT id, name, cost_price, stock FROM products ORDER BY cost_price DESC LIMIT 20"
     if "recent sales" in q:
         return (
-            "SELECT s.id, p.name, s.quantity, s.total_price, s.created_at "
+            "SELECT s.id, p.name, s.quantity, s.revenue AS total_price, s.created_at "
             "FROM sales s JOIN products p ON p.id = s.product_id "
             "ORDER BY s.created_at DESC LIMIT 50"
         )

@@ -11,6 +11,7 @@ import {
   PageHeader,
 } from "../components/UI";
 import { formatPKR } from "../utils/currency";
+import { printRecord } from "../utils/print";
 
 // ---------------------------------------------------------------------------
 // Tab state via URL query param (?tab=users | ?tab=partners)
@@ -134,6 +135,15 @@ function UsersTab() {
                     setForm({ name: row.name, email: row.email, role: row.role, password: "", ownership_percentage: "" });
                     setEditOpen(true);
                   }}
+                  onPrint={() => printRecord({
+                    title: "User Details",
+                    fields: [
+                      { label: "Name", value: row.name },
+                      { label: "Email", value: row.email },
+                      { label: "Role", value: row.role },
+                      { label: "Status", value: row.status || "Active" },
+                    ],
+                  })}
                   onDelete={() => setDeleting(row)}
                 />
               ),

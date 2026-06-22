@@ -11,12 +11,14 @@ class ProductCreate(BaseModel):
     category: str | None = Field(default=None, max_length=80)
     image_data: str | None = None
     image_mime: str | None = None
+    barcode_number: str | None = Field(default=None, max_length=20)
 
 
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     sku: str | None = Field(default=None, max_length=80)
     cost_price: float | None = Field(default=None, gt=0)
+    selling_price: float | None = Field(default=None, ge=0)
     stock: int | None = Field(default=None, ge=0)
     category: str | None = Field(default=None, max_length=80)
     image_data: str | None = None
@@ -38,6 +40,8 @@ class ProductRead(BaseModel):
     category: str | None
     image_data: str | None
     image_mime: str | None
+    barcode_number: str | None
+    barcode_image_path: str | None
     created_at: datetime
 
     class Config:

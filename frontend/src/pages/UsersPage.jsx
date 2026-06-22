@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, Modal, PageHeader } from "../components/UI";
+import { printRecord } from "../utils/print";
 
 export default function UsersPage() {
   const [rows, setRows] = useState([]);
@@ -104,6 +105,15 @@ export default function UsersPage() {
                 <ActionButtons
                   onView={() => { setSelected(row); setViewOpen(true); }}
                   onEdit={() => { setSelected(row); setForm((prev) => ({ ...prev, name: row.name, email: row.email, role: row.role, password: "" })); setEditOpen(true); }}
+                  onPrint={() => printRecord({
+                    title: "User Details",
+                    fields: [
+                      { label: "Name", value: row.name },
+                      { label: "Email", value: row.email },
+                      { label: "Role", value: row.role },
+                      { label: "Status", value: row.status || "Active" },
+                    ],
+                  })}
                   onDelete={() => setDeleting(row)}
                 />
               ),

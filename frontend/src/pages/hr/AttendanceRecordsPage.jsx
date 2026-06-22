@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getAttendanceRecords, getEmployees } from "../../api/hr";
-import { DataTable, PageHeader } from "../../components/UI";
+import { DataTable, PageHeader, StatCard } from "../../components/UI";
 
 export default function AttendanceRecordsPage() {
   const [records, setRecords] = useState([]);
@@ -76,17 +76,10 @@ export default function AttendanceRecordsPage() {
       </div>
 
       {/* Summary */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        {[
-          { label: "Present", value: present, color: "text-emerald-600 dark:text-emerald-400" },
-          { label: "Late",    value: late,    color: "text-amber-600 dark:text-amber-400" },
-          { label: "Absent",  value: absent,  color: "text-rose-600 dark:text-rose-400" },
-        ].map((s) => (
-          <div key={s.label} className="panel text-center">
-            <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{s.label}</p>
-            <p className={`mt-1 text-2xl font-bold ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+      <div className="mb-4 grid grid-cols-3 gap-4">
+        <StatCard title="Present" value={present} tone="emerald" icon="ti-user-check" />
+        <StatCard title="Late"    value={late}    tone="amber"   icon="ti-user-minus" />
+        <StatCard title="Absent"  value={absent}  tone="rose"    icon="ti-user-x" />
       </div>
 
       {loading ? <div className="panel">Loading...</div> : (

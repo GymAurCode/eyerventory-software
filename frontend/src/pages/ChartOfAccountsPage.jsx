@@ -161,20 +161,9 @@ function BalanceSheetTab() {
 
       {/* Summary stat row */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Assets",      value: data.assets,      color: "#10B981" },
-          { label: "Total Liabilities", value: data.liabilities, color: "#EF4444" },
-          { label: "Total Equity",      value: data.equity,      color: "#6366F1" },
-        ].map(({ label, value, color }) => (
-          <div
-            key={label}
-            className="rounded-xl border p-4 text-center"
-            style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}
-          >
-            <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{label}</p>
-            <p className="mt-1 text-xl font-bold font-mono" style={{ color }}>{formatPKR(value)}</p>
-          </div>
-        ))}
+        <StatCard title="Total Assets"      value={data.assets}      tone="emerald" money icon="ti-building-bank" />
+        <StatCard title="Total Liabilities" value={data.liabilities} tone="rose"    money icon="ti-credit-card" />
+        <StatCard title="Total Equity"      value={data.equity}      tone="indigo"  money icon="ti-scale" />
       </div>
 
       {/* Detailed sections */}
@@ -218,16 +207,9 @@ function ProfitLossTab() {
     <div className="space-y-4">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Revenue",  value: data.revenue,  color: "#F59E0B" },
-          { label: "Total Expenses", value: data.expenses, color: "#F97316" },
-          { label: isProfit ? "Net Profit" : "Net Loss", value: Math.abs(data.profit), color: isProfit ? "#10B981" : "#EF4444" },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-xl border p-4 text-center" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
-            <p className="text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{label}</p>
-            <p className="mt-1 text-xl font-bold font-mono" style={{ color }}>{formatPKR(value)}</p>
-          </div>
-        ))}
+        <StatCard title="Total Revenue"  value={data.revenue}  tone="amber"  money icon="ti-currency-dollar" />
+        <StatCard title="Total Expenses" value={data.expenses} tone="rose"   money icon="ti-shopping-cart" />
+        <StatCard title={isProfit ? "Net Profit" : "Net Loss"} value={Math.abs(data.profit)} tone={isProfit ? "emerald" : "rose"} money icon={isProfit ? "ti-trending-up" : "ti-trending-down"} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -294,7 +276,9 @@ function JournalTab({ journal }) {
     { key: "reference_type", label: "Ref Type" },
     {
       key: "actions", label: "", render: (r) => (
-        <button className="btn-soft px-3 py-1 text-xs" onClick={() => setSelectedEntry(r)}>View</button>
+        <button className="icon-btn icon-btn-view" onClick={() => setSelectedEntry(r)} title="View Details">
+          <i className="ti ti-eye" style={{ fontSize: "16px" }} />
+        </button>
       ),
     },
   ];
@@ -370,10 +354,10 @@ export default function ChartOfAccountsPage({ embedded = false }) {
       {!embedded && <PageHeader title="Chart of Accounts" subtitle="Double-entry ledger, balance sheet, and P&L" />}
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard title="Total Assets"      value={totalAssets}      tone="emerald" money />
-        <StatCard title="Total Liabilities" value={totalLiabilities} tone="rose"    money />
-        <StatCard title="Total Revenue"     value={totalRevenue}     tone="amber"   money />
-        <StatCard title="Total Expenses"    value={totalExpenses}    tone="indigo"  money />
+        <StatCard title="Total Assets"      value={totalAssets}      tone="emerald" money icon="ti-building-bank" />
+        <StatCard title="Total Liabilities" value={totalLiabilities} tone="rose"    money icon="ti-credit-card" />
+        <StatCard title="Total Revenue"     value={totalRevenue}     tone="amber"   money icon="ti-currency-dollar" />
+        <StatCard title="Total Expenses"    value={totalExpenses}    tone="indigo"  money icon="ti-shopping-cart" />
       </div>
 
       <Tabs active={activeTab} onChange={setActiveTab} />

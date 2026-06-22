@@ -180,15 +180,23 @@ export default function MyReminders() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1">
                       {r.status === "pending" && (
                         <>
-                          <button onClick={() => handleComplete(r.id)} className="rounded px-2 py-1 text-xs bg-green-600 text-white hover:bg-green-700">Done</button>
-                          <button onClick={() => handleSnooze(r.id, 5)} className="rounded px-2 py-1 text-xs bg-[var(--surface-2,rgba(0,0,0,0.06))] hover:opacity-80">+5m</button>
+                          <button className="icon-btn icon-btn-view" onClick={() => handleComplete(r.id)} title="Mark Done">
+                            <i className="ti ti-check" style={{ fontSize: "16px" }} />
+                          </button>
+                          <button className="icon-btn" onClick={() => handleSnooze(r.id, 5)} title="Snooze 5m">
+                            <i className="ti ti-clock" style={{ fontSize: "16px" }} />
+                          </button>
                         </>
                       )}
-                      <button onClick={() => setEditTarget(r)} className="rounded px-2 py-1 text-xs bg-[var(--surface-2,rgba(0,0,0,0.06))] hover:opacity-80">Edit</button>
-                      <button onClick={() => setDeleteTarget(r)} className="rounded px-2 py-1 text-xs text-red-500 bg-[var(--surface-2,rgba(0,0,0,0.06))] hover:opacity-80">Del</button>
+                      <button className="icon-btn icon-btn-edit" onClick={() => setEditTarget(r)} title="Edit">
+                        <i className="ti ti-edit" style={{ fontSize: "16px" }} />
+                      </button>
+                      <button className="icon-btn icon-btn-danger" onClick={() => setDeleteTarget(r)} title="Delete">
+                        <i className="ti ti-trash" style={{ fontSize: "16px" }} />
+                      </button>
                     </div>
                   </td>
                 </tr>

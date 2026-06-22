@@ -4,6 +4,7 @@ import api from "../api/client";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
 import { useShortcuts } from "../contexts/ShortcutContext";
 import { formatPKR } from "../utils/currency";
+import { printRecord } from "../utils/print";
 
 const categories = ["Logistics", "Utilities", "Rent", "Salary", "Maintenance", "Other"];
 
@@ -80,9 +81,9 @@ export default function ExpensesPage() {
     <div className="space-y-4">
       <PageHeader title="Expenses" subtitle="Track operational expenses by category" />
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard title="Entries" value={String(rows.length)} tone="indigo" />
-        <StatCard title="Total Expense" value={rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)} tone="rose" money />
-        <StatCard title="Average" value={rows.length ? rows.reduce((sum, row) => sum + Number(row.amount || 0), 0) / rows.length : 0} tone="amber" money />
+        <StatCard title="Entries" value={rows.length} tone="indigo" icon="ti-file-text" />
+        <StatCard title="Total Expense" value={rows.reduce((sum, row) => sum + Number(row.amount || 0), 0)} tone="rose" money icon="ti-currency-dollar" />
+        <StatCard title="Average" value={rows.length ? rows.reduce((sum, row) => sum + Number(row.amount || 0), 0) / rows.length : 0} tone="amber" money icon="ti-calculator" />
       </div>
 
       <form className="panel grid gap-3 md:grid-cols-2 lg:grid-cols-5" onSubmit={submit}>
@@ -111,6 +112,15 @@ export default function ExpensesPage() {
                 <ActionButtons
                   onView={() => { setSelected(row); setViewOpen(true); }}
                   onEdit={() => { setSelected(row); setForm({ category: row.category, amount: String(row.amount), note: row.note || "", expense_date: row.expense_date }); setEditOpen(true); }}
+                  onPrint={() => printRecord({
+                    title: "Expense Details",
+                    fields: [
+                      { label: "Category", value: row.category },
+                      { label: "Amount", value: formatPKR(row.amount) },
+                      { label: "Note", value: row.note || "—" },
+                      { label: "Date", value: row.expense_date },
+                    ],
+                  })}
                   onDelete={() => setDeleting(row)}
                 />
               ),

@@ -1,4 +1,5 @@
 from .account import Account
+from .activity_log import ActivityLog
 from .app_setting import AppSetting
 from .attendance_log import AttendanceLog
 from .credit import CreditAccount, CreditItem, CreditPayment, CreditTransaction, LedgerEntry
@@ -11,6 +12,7 @@ from .leave import Leave
 from .owner_share import OwnerShare
 from .payment import Payment
 from .payroll import Payroll
+from .pos_sale import PosSale, PosSaleItem, SaleReturn, SaleReturnItem
 from .product import Product
 from .reminder import NotificationLog, Reminder, ReminderTemplate
 from .purchase import Purchase, PurchaseItem

@@ -16,5 +16,8 @@ class Product(Base):
     category = Column(String(80), nullable=True)
     image_data = Column(String, nullable=True)
     image_mime = Column(String(32), nullable=True)
+    barcode_number = Column(String(20), nullable=True, unique=True)
+    barcode_image_path = Column(String(255), nullable=True)
+    low_stock_threshold = Column(Integer, nullable=False, default=10)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.product import Product
 from backend.schemas.product import BulkImportResult, ProductAddStock, ProductCreate, ProductUpdate
+from backend.utils.activity import log_activity
 
 logger = logging.getLogger("inventory-products")
 
@@ -32,6 +33,7 @@ def list_products(db: Session):
 def create_product(db: Session, payload: ProductCreate):
     # Check for duplicates before creating
     from backend.services.ai_intelligence_service import AIIntelligenceService
+    from backend.utils.barcode import generate_barcode
     ai_service = AIIntelligenceService(db)
     duplicate_check = ai_service.check_duplicate_risk(payload.name, payload.sku)
     
@@ -60,6 +62,17 @@ def create_product(db: Session, payload: ProductCreate):
     db.add(product)
     db.commit()
     db.refresh(product)
+
+    # Auto-generate barcode if not provided
+    if not product.barcode_number:
+        code, image_path = generate_barcode(product.id)
+        product.barcode_number = code
+        product.barcode_image_path = image_path
+        db.commit()
+        db.refresh(product)
+
+    log_activity(db, "item_added", f"New item added: {product.name}", reference_id=product.id, reference_type="inventory")
+
     return product
 
 
@@ -74,6 +87,9 @@ def update_product(db: Session, product_id: int, payload: ProductUpdate):
         setattr(product, key, value)
     db.commit()
     db.refresh(product)
+
+    log_activity(db, "item_updated", f"Item updated: {product.name}", reference_id=product.id, reference_type="inventory")
+
     return product
 
 
@@ -81,8 +97,10 @@ def delete_product(db: Session, product_id: int) -> bool:
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         return False
+    name = product.name
     db.delete(product)
     db.commit()
+    log_activity(db, "item_deleted", f"Item deleted: {name}", reference_id=product_id, reference_type="inventory")
     return True
 
 
@@ -95,6 +113,7 @@ def add_stock(db: Session, product_id: int, payload: ProductAddStock):
         product.cost_price = payload.price
     db.commit()
     db.refresh(product)
+    log_activity(db, "item_updated", f"Stock added: {product.name} (+{payload.quantity})", reference_id=product.id, reference_type="inventory")
     return product
 
 

@@ -167,9 +167,9 @@ export default function PaymentsPage({ embedded = false }) {
       )}
 
       <div className="mb-6 grid grid-cols-3 gap-4">
-        <StatCard title="Total Payments" value={payments.length} tone="indigo" />
-        <StatCard title="Cash Received" value={received} tone="emerald" money />
-        <StatCard title="Cash Paid Out" value={paid} tone="rose" money />
+        <StatCard title="Total Payments" value={payments.length} tone="indigo" icon="ti-cash" />
+        <StatCard title="Cash Received" value={received} tone="emerald" money icon="ti-arrow-down-circle" />
+        <StatCard title="Cash Paid Out" value={paid} tone="rose" money icon="ti-arrow-up-circle" />
       </div>
 
       {payments.length === 0

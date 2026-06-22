@@ -434,6 +434,84 @@ ipcMain.handle("backup:setAuto", (_event, enabled) => {
   return { ok: true };
 });
 
+/* ---------------- THERMAL PRINTER IPC ---------------- */
+
+ipcMain.handle("print-receipt", async (_event, saleData) => {
+  try {
+    const { ThermalPrinter, PrinterTypes, CharacterSet } = require("node-thermal-printer");
+
+    let printer = new ThermalPrinter({
+      type: PrinterTypes.EPSON,
+      interface: "printer:auto",
+      characterSet: CharacterSet.PC437_USA,
+      removeSpecialCharacters: false,
+      lineCharacter: "-",
+    });
+
+    let isConnected = await printer.isPrinterConnected();
+    if (!isConnected) {
+      return { success: false, error: "Printer not connected" };
+    }
+
+    // Header
+    printer.alignCenter();
+    printer.bold(true);
+    printer.println("EYERFLOW OPTICAL");
+    printer.bold(false);
+    printer.println("Your Shop Address Here");
+    printer.println("Phone: 0300-0000000");
+    printer.drawLine();
+
+    // Bill info
+    printer.alignLeft();
+    printer.println(`Date: ${saleData.date}`);
+    printer.println(`Bill#: ${saleData.bill_number}`);
+    if (saleData.customer_name) {
+      printer.println(`Customer: ${saleData.customer_name}`);
+    }
+    printer.drawLine();
+
+    // Items
+    saleData.items.forEach((item) => {
+      printer.tableCustom([
+        { text: item.item_name || item.name, align: "LEFT", width: 0.5 },
+        { text: `x${item.qty}`, align: "CENTER", width: 0.15 },
+        { text: `${item.total_price || item.total}`, align: "RIGHT", width: 0.35 },
+      ]);
+    });
+
+    printer.drawLine();
+
+    // Totals
+    printer.alignRight();
+    printer.println(`Subtotal: ${saleData.subtotal}`);
+    if (saleData.discount > 0) {
+      printer.println(`Discount: -${saleData.discount}`);
+    }
+    printer.bold(true);
+    printer.println(`TOTAL: ${saleData.total}`);
+    printer.bold(false);
+
+    if (saleData.payment_method === "cash") {
+      printer.println(`Cash: ${saleData.cash_received}`);
+      printer.println(`Change: ${saleData.change}`);
+    }
+
+    printer.drawLine();
+    printer.alignCenter();
+    printer.println("Thank you for visiting!");
+    printer.println("Come again :)");
+
+    printer.cut();
+    await printer.execute();
+
+    return { success: true };
+  } catch (err) {
+    log.error("[printer] thermal print failed:", err.message);
+    return { success: false, error: err.message };
+  }
+});
+
 /* ---------------- LICENSE IPC ---------------- */
 
 ipcMain.handle("license:check", () => {

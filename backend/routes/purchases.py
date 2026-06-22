@@ -7,6 +7,7 @@ from backend.database import get_db
 from backend.routes.deps import require_roles
 from backend.schemas.purchase import PurchaseCreate, PurchaseItemRead, PurchaseRead
 from backend.services import purchase_service
+from backend.utils.activity import log_activity
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/purchases", tags=["purchases"])
@@ -71,6 +72,12 @@ def create_purchase(
     """Create a new purchase with items and accounting entries."""
     try:
         purchase = purchase_service.create_purchase(db, payload)
+        log_activity(
+            db, "purchase",
+            f"Purchase added — Rs. {purchase.final_amount:.2f}" if purchase.final_amount else "Purchase added",
+            reference_id=purchase.id, reference_type="purchase",
+            amount=float(purchase.final_amount) if purchase.final_amount else None,
+        )
         return {
             "success": True,
             "data": _enrich(purchase),

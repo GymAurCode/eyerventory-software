@@ -1,31 +1,30 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import api from "./api/client";
 import AppSidebar from "./components/AppSidebar";
 import CommandPalette from "./components/CommandPalette";
 import HelpDocsModal from "./components/HelpDocsModal";
 import NotificationCenter from "./components/NotificationCenter";
-import { SIDEBAR_ITEMS } from "./config/navigation";
 import { COMMAND_ITEMS, formatShortcut } from "./config/shortcuts";
-import DashboardPage from "./pages/DashboardPage";
-import ExpensesPage from "./pages/ExpensesPage";
-import FinancePage from "./pages/FinancePage";
-import AccountingPage from "./pages/AccountingPage";
-import LoginPage from "./pages/LoginPage";
-import PeoplePage from "./pages/PeoplePage";
-import ProductsPage from "./pages/ProductsPage";
-import PurchasesPage from "./pages/PurchasesPage";
-import SalesPage from "./pages/SalesPage";
-import SettingsPage from "./pages/SettingsPage";
-import CreditManagementPage from "./pages/CreditManagementPage";
-import HRManagementPage from "./pages/hr/HRManagementPage";
-import ChartOfAccountsPage from "./pages/ChartOfAccountsPage";
-import PaymentsPage from "./pages/PaymentsPage";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { BrandingProvider, useBranding } from "./contexts/BrandingContext";
 import { ShortcutProvider } from "./contexts/ShortcutContext";
 import { useTheme } from "./contexts/ThemeContext";
 import { useShortcutManager } from "./hooks/useShortcutManager";
 import { useReminderWebSocket } from "./hooks/useReminderWebSocket";
+
+import DashboardPage from "./pages/DashboardPage";
+import ExpensesPage from "./pages/ExpensesPage";
+import FinancePage from "./pages/FinancePage";
+import LoginPage from "./pages/LoginPage";
+import PeoplePage from "./pages/PeoplePage";
+import ProductsPage from "./pages/ProductsPage";
+import PurchasesPage from "./pages/PurchasesPage";
+import POSPage from "./pages/POSPage";
+import SalesPage from "./pages/SalesPage";
+import SettingsPage from "./pages/SettingsPage";
+import CreditManagementPage from "./pages/CreditManagementPage";
+import HRManagementPage from "./pages/hr/HRManagementPage";
 
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const AIIntelligencePage = lazy(() => import("./pages/AIIntelligencePage"));
@@ -44,19 +43,45 @@ function Layout() {
   const { token, logout, role, name } = useAuth();
   const { companyName } = useBranding();
   const { toggleTheme, theme } = useTheme();
-  const [collapsed, setCollapsed] = useState(localStorage.getItem("sidebar_collapsed") === "1");
   const [showPalette, setShowPalette] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const sidebarItems = useMemo(() => SIDEBAR_ITEMS.filter((item) => item.roles.includes(role)), [role]);
 
-  // Real-time reminder notifications
   const { notifications, dismiss, dismissAll, connected } = useReminderWebSocket(token);
 
-  // For HashRouter, extract the current path from hash
-  const currentPath = location.hash ? location.hash.slice(1) : "/";
+  const isDark = theme === "dark";
+
+  const [bellOpen, setBellOpen] = useState(false);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const bellRef = useRef(null);
+
+  const checkLowStock = useCallback(async () => {
+    try {
+      const res = await api.get("/activities/low-stock");
+      const data = res.data;
+      setLowStockItems(data.items || []);
+      setLowStockCount(data.count || 0);
+    } catch {
+      try {
+        const res = await api.get("/products");
+        const items = Array.isArray(res.data) ? res.data : [];
+        const low = items.filter((p) => Number(p.stock) < (p.low_stock_threshold || 10));
+        setLowStockItems(low);
+        setLowStockCount(low.length);
+      } catch {
+        // backend not ready yet
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    checkLowStock();
+    const interval = setInterval(checkLowStock, 60000);
+    return () => clearInterval(interval);
+  }, [checkLowStock]);
 
   const dispatchAction = (actionId) => {
     if (actionId === "app.commandPalette") return setShowPalette(true), true;
@@ -68,11 +93,12 @@ function Layout() {
     if (actionId === "nav.credit") return navigate("/credit"), true;
     if (actionId === "nav.expenses") return navigate("/expenses"), true;
     if (actionId === "nav.finance" && role === "owner") return navigate("/finance"), true;
-    if (actionId === "nav.accounting" && role === "owner") return navigate("/accounting"), true;
+    if (actionId === "nav.ledger" && role === "owner") return navigate("/finance?tab=ledger"), true;
     if (actionId === "nav.analytics" && role === "owner") return navigate("/analytics"), true;
     if (actionId === "nav.ai" && role === "owner") return navigate("/ai-intelligence"), true;
     if (actionId === "nav.reminders") return navigate("/reminders"), true;
     if (actionId === "nav.users" && role === "owner") return navigate("/people"), true;
+    if (actionId === "nav.hr" && (role === "owner" || role === "admin" || role === "hr")) return navigate("/hr"), true;
     return false;
   };
 
@@ -107,65 +133,130 @@ function Layout() {
     }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("sidebar_collapsed", collapsed ? "1" : "0");
-  }, [collapsed]);
-
   if (!token) return <LoginPage />;
 
   const shortcutApi = { registerPageAction, triggerAction, activeActionId, formatShortcut };
 
   return (
     <ShortcutProvider value={shortcutApi}>
-      <div className="h-screen overflow-hidden" style={{ background: "var(--bg-app)", color: "var(--text-primary)" }}>
-        <div className="flex h-screen overflow-hidden">
-          <AppSidebar collapsed={collapsed} onToggle={() => setCollapsed((s) => !s)} items={sidebarItems} companyName={companyName} />
-          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-            <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b px-6" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
-              <div>
-                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{currentPath}</p>
-                <p className="text-sm font-semibold">{companyName}</p>
+      <div className="flex h-screen overflow-hidden">
+        <AppSidebar />
+        <div className="flex min-w-0 flex-1 flex-col ml-2 mr-2 my-2 rounded-xl overflow-hidden" style={{ background: "var(--bg-app)" }}>
+          <header className="flex h-14 items-center justify-between px-3" style={{ background: "var(--bg-card)", borderBottom: "0.5px solid var(--border-color)", borderRadius: "12px" }}>
+            <div className="flex items-center gap-3">
+              <h1 className="text-base font-medium" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>{companyName || "EyerFlow"}</h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <i className="ti ti-search absolute left-2.5 top-1/2 -translate-y-1/2" style={{ fontSize: "13px", color: "var(--text-secondary)" }} />
+                <input
+                  className="rounded-lg border bg-transparent py-1.5 pl-7 pr-3 text-xs outline-none transition-all w-44 focus:w-56"
+                  placeholder="Search..."
+                  style={{
+                    borderColor: "var(--border-color)",
+                    color: isDark ? "#c0efef" : "#002a2a",
+                  }}
+                  onFocus={(e) => e.currentTarget.style.borderColor = "#008080"}
+                  onBlur={(e) => e.currentTarget.style.borderColor = "var(--border-color)"}
+                />
               </div>
-              <div className="flex items-center gap-3">
-                <span className="rounded-full px-3 py-1 text-xs font-semibold uppercase" style={{ border: "1px solid var(--border-color)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>{name} ({role})</span>
-                <button className={`btn-soft ${activeActionId === "app.help" ? "ring-2 ring-indigo-500" : ""}`} title={`Help (${formatShortcut("app.help")})`} onClick={() => setShowHelp(true)}>?</button>
-                <button className="btn-soft" onClick={toggleTheme}>{theme === "dark" ? "Light" : "Dark"} Mode</button>
-                <button onClick={logout} className="btn-soft">Logout</button>
+
+              {/* ── Low Stock Bell ── */}
+              <div className="relative" ref={bellRef}>
+                <button
+                  className="relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+                  style={{ border: "0.5px solid var(--border-color)" }}
+                  onClick={() => setBellOpen((prev) => !prev)}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                >
+                  <i className="ti ti-bell" style={{ fontSize: "15px", color: "var(--text-secondary)" }} />
+                  {lowStockCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                      {lowStockCount > 9 ? "9+" : lowStockCount}
+                    </span>
+                  )}
+                </button>
+
+                {bellOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
+                    <div
+                      className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-xl border shadow-2xl"
+                      style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}
+                    >
+                      <div className="border-b px-3 py-2 text-xs font-semibold" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}>
+                        Low Stock Alerts
+                      </div>
+                      {lowStockItems.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-xs" style={{ color: "var(--text-secondary)" }}>
+                          All items are sufficient
+                        </div>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto">
+                          {lowStockItems.map((item) => (
+                            <button
+                              key={item.id}
+                              className="flex w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-[var(--bg-hover)]"
+                              onClick={() => { navigate("/products"); setBellOpen(false); }}
+                            >
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 text-xs font-bold">
+                                {item.stock}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{item.name}</p>
+                                <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Stock: {item.stock} — Click to view</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-            </header>
-            <main className="flex-1 p-6">
-              <Suspense fallback={<div className="panel">Loading analytics...</div>}>
-                <Routes>
-                  <Route path="/" element={<ProtectedRoute allow={["owner"]}><DashboardPage /></ProtectedRoute>} />
-                  <Route path="/products" element={<ProtectedRoute allow={["owner", "staff"]}><ProductsPage /></ProtectedRoute>} />
-                  <Route path="/sales" element={<ProtectedRoute allow={["owner", "staff"]}><SalesPage /></ProtectedRoute>} />
-                  <Route path="/purchases" element={<ProtectedRoute allow={["owner", "staff"]}><PurchasesPage /></ProtectedRoute>} />
-                  <Route path="/credit" element={<ProtectedRoute allow={["owner", "staff"]}><CreditManagementPage /></ProtectedRoute>} />
-                  <Route path="/expenses" element={<ProtectedRoute allow={["owner", "staff"]}><ExpensesPage /></ProtectedRoute>} />
-                  <Route path="/finance" element={<ProtectedRoute allow={["owner"]}><FinancePage /></ProtectedRoute>} />
-                  <Route path="/accounting" element={<ProtectedRoute allow={["owner"]}><AccountingPage /></ProtectedRoute>} />
-                  <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
-                  <Route path="/ai-intelligence" element={<ProtectedRoute allow={["owner"]}><AIIntelligencePage /></ProtectedRoute>} />
-                  <Route path="/ai-intelligence/low-stock" element={<ProtectedRoute allow={["owner"]}><LowStockDetailPage /></ProtectedRoute>} />
-                  <Route path="/ai-intelligence/anomalies" element={<ProtectedRoute allow={["owner"]}><AnomalyDetailPage /></ProtectedRoute>} />
-                  <Route path="/ai-intelligence/predictions-risk" element={<ProtectedRoute allow={["owner"]}><PredictionsRiskPage /></ProtectedRoute>} />
-                  <Route path="/partners" element={<Navigate to="/people?tab=partners" replace />} />
-                  <Route path="/users" element={<Navigate to="/people?tab=users" replace />} />
-                  <Route path="/people" element={<ProtectedRoute allow={["owner"]}><PeoplePage /></ProtectedRoute>} />
-                  <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
-                  <Route path="/reports" element={<Navigate to="/settings?tab=reports" replace />} />
-                  <Route path="/hr/backup" element={<Navigate to="/settings?tab=backup" replace />} />
-                  <Route path="/hr" element={<ProtectedRoute allow={["owner", "admin", "hr"]}><HRManagementPage /></ProtectedRoute>} />
-                  <Route path="/reminders" element={<ProtectedRoute allow={["owner", "staff"]}><RemindersPage /></ProtectedRoute>} />
-                  <Route path="/accounting/coa" element={<ProtectedRoute allow={["owner"]}><ChartOfAccountsPage /></ProtectedRoute>} />
-                  <Route path="/accounting/purchases" element={<ProtectedRoute allow={["owner"]}><PurchasesPage /></ProtectedRoute>} />
-                  <Route path="/accounting/credit" element={<ProtectedRoute allow={["owner"]}><CreditManagementPage /></ProtectedRoute>} />
-                  <Route path="/accounting/payments" element={<ProtectedRoute allow={["owner"]}><PaymentsPage /></ProtectedRoute>} />
-                  <Route path="*" element={<Navigate to={role === "staff" ? "/products" : "/"} replace />} />
-                </Routes>
-              </Suspense>
-            </main>
-          </div>
+
+              <button
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-xs transition-colors"
+                style={{ border: "0.5px solid var(--border-color)" }}
+                onClick={toggleTheme}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--bg-hover)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <i className={`ti ${isDark ? "ti-sun" : "ti-moon"}`} style={{ fontSize: "14px", color: "var(--text-secondary)" }} />
+              </button>
+            </div>
+          </header>
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-3">
+          <main className="flex-1">
+            <Suspense fallback={<div className="flex items-center justify-center h-32 text-xs" style={{ color: "var(--text-secondary)" }}>Loading...</div>}>
+              <Routes>
+                <Route path="/" element={<ProtectedRoute allow={["owner"]}><DashboardPage /></ProtectedRoute>} />
+                <Route path="/pos" element={<ProtectedRoute allow={["owner", "staff"]}><POSPage /></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute allow={["owner", "staff"]}><ProductsPage /></ProtectedRoute>} />
+                <Route path="/sales" element={<ProtectedRoute allow={["owner", "staff"]}><SalesPage /></ProtectedRoute>} />
+                <Route path="/purchases" element={<ProtectedRoute allow={["owner", "staff"]}><PurchasesPage /></ProtectedRoute>} />
+                <Route path="/credit" element={<ProtectedRoute allow={["owner", "staff"]}><CreditManagementPage /></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute allow={["owner", "staff"]}><ExpensesPage /></ProtectedRoute>} />
+                <Route path="/finance" element={<ProtectedRoute allow={["owner"]}><FinancePage /></ProtectedRoute>} />
+                <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
+                <Route path="/ai-intelligence" element={<ProtectedRoute allow={["owner"]}><AIIntelligencePage /></ProtectedRoute>} />
+                <Route path="/ai-intelligence/low-stock" element={<ProtectedRoute allow={["owner"]}><LowStockDetailPage /></ProtectedRoute>} />
+                <Route path="/ai-intelligence/anomalies" element={<ProtectedRoute allow={["owner"]}><AnomalyDetailPage /></ProtectedRoute>} />
+                <Route path="/ai-intelligence/predictions-risk" element={<ProtectedRoute allow={["owner"]}><PredictionsRiskPage /></ProtectedRoute>} />
+                <Route path="/partners" element={<Navigate to="/people?tab=partners" replace />} />
+                <Route path="/users" element={<Navigate to="/people?tab=users" replace />} />
+                <Route path="/people" element={<ProtectedRoute allow={["owner"]}><PeoplePage /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute allow={["owner"]}><SettingsPage /></ProtectedRoute>} />
+                <Route path="/reports" element={<Navigate to="/settings?tab=reports" replace />} />
+                <Route path="/hr/backup" element={<Navigate to="/settings?tab=backup" replace />} />
+                <Route path="/hr" element={<ProtectedRoute allow={["owner", "admin", "hr"]}><HRManagementPage /></ProtectedRoute>} />
+                <Route path="/reminders" element={<ProtectedRoute allow={["owner", "staff"]}><RemindersPage /></ProtectedRoute>} />
+                <Route path="*" element={<Navigate to={role === "staff" ? "/products" : "/"} replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
         </div>
       </div>
       {showGuide && (
@@ -183,6 +274,7 @@ function Layout() {
         onDismissAll={dismissAll}
         connected={connected}
       />
+      <div id="print-area" />
     </ShortcutProvider>
   );
 }

@@ -11,12 +11,11 @@ reportlab
 XlsxWriter
 openpyxl==3.1.5
 email-validator
-<<<<<<< HEAD
-python-multipart
 numpy
 scikit-learn
 openai
 Pillow
+python-barcode
 pytesseract
 joblib
 statsmodels
@@ -26,6 +25,5 @@ xgboost
 faster-whisper
 apscheduler>=3.10,<4.0
 websockets>=12.0
-openpyxl>=3.1
-rapidfuzz==3.10.1
+rapidfuzz>=3.14.0
 

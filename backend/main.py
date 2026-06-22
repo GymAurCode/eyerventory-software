@@ -15,14 +15,13 @@ from sqlalchemy.orm import Session
 
 from backend.core.security import get_password_hash
 from backend.database import Base, SessionLocal, engine
-from backend.ai.bootstrap import ensure_ai_seed_data
 from backend.initDb import apply_startup_migrations
 from backend.models.user import User
 from backend.models.owner_share import OwnerShare
 from backend.routes import (
-    accounting, ai, attendance, auth, credits, customers, employees, expenses,
-    finance, hr_payments, ledger, leaves, partners, payments, payroll, products,
-    purchases, reminders, reports, sales, settings, suppliers, users,
+    accounting, activities, ai, attendance, auth, credits, customers, employees,
+    expenses, finance, hr_payments, ledger, leaves, partners, payments, payroll,
+    pos, products, purchases, reminders, reports, sales, settings, suppliers, users,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -110,6 +109,8 @@ app.include_router(hr_payments.router,prefix="/api")
 app.include_router(payments.router,   prefix="/api")
 app.include_router(ai.router,         prefix="/api")
 app.include_router(reminders.router,  prefix="/api")
+app.include_router(activities.router, prefix="/api")
+app.include_router(pos.router,        prefix="/api")
 
 
 @app.get("/api/health", tags=["health"])
@@ -151,11 +152,6 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
     apply_startup_migrations()
     seed_owner_user()
-    db = SessionLocal()
-    try:
-        logger.info("AI seed: %s", ensure_ai_seed_data(db))
-    finally:
-        db.close()
     from backend.services.reminder_scheduler import start_scheduler
     start_scheduler()
     from backend.services.backup_service import resume_on_startup

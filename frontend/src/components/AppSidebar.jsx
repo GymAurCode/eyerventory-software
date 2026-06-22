@@ -1,125 +1,153 @@
-import { NavLink } from "react-router-dom";
-import { MenuIcon } from "./icons/SidebarIcons";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { NAV_SECTIONS } from "../config/navigation";
 
-function navItemStyle(isActive, theme, color) {
-  if (!isActive) {
-    // text always uses CSS var so it respects dark/light
-    return { background: "transparent", borderColor: "transparent" };
-  }
-  if (theme === "dark") {
-    return {
-      background: `color-mix(in srgb, ${color} 22%, var(--bg-card))`,
-      borderColor: `color-mix(in srgb, ${color} 45%, var(--border-color))`,
-    };
-  }
-  return {
-    background: `color-mix(in srgb, ${color} 10%, var(--bg-card))`,
-    borderColor: color,
-  };
+function Logo({ collapsed }) {
+  return (
+    <div className={`flex items-center gap-3 px-4 pt-4 pb-4 ${collapsed ? "justify-center" : ""}`}>
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F5C518]">
+        <i className="ti ti-eye text-[#001a1a]" style={{ fontSize: "16px" }} />
+      </div>
+      {!collapsed && (
+        <div>
+          <p className="text-xs font-semibold text-white leading-tight">EyerFlow</p>
+          <p className="text-[9px] uppercase tracking-wider" style={{ color: "#7ab0b0" }}>Inventory</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function AppSidebar({ collapsed, onToggle, items, companyName }) {
+function SectionLabel({ label, collapsed }) {
+  if (collapsed) return <div className="h-2" />;
+  return (
+    <p
+      className="px-4 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-[1.5px]"
+      style={{ color: "rgba(255,255,255,0.25)" }}
+    >
+      {label}
+    </p>
+  );
+}
+
+function NavItem({ item, currentPath, searchParams, collapsed }) {
+  const navigate = useNavigate();
+  const route = item.route;
+
+  const isActive = (() => {
+    if (route.includes("?")) {
+      const [path, qs] = route.split("?");
+      const [key, val] = qs.split("=");
+      return currentPath === path && searchParams.get(key) === val;
+    }
+    if (item.end) return currentPath === route;
+    return currentPath.startsWith(route);
+  })();
+
+  return (
+    <button
+      onClick={() => navigate(route)}
+      title={collapsed ? item.label : undefined}
+      className={`group relative flex w-full items-center text-left transition-all duration-150 ${collapsed ? "justify-center px-2 py-2" : "gap-3 px-4 py-1.5"}`}
+      style={{
+        color: isActive ? "#F5C518" : "var(--sidebar-text)",
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) e.currentTarget.style.background = "var(--sidebar-hover)";
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) e.currentTarget.style.background = "transparent";
+      }}
+    >
+      <i className={`ti ${item.icon}`} style={{ fontSize: "14px", color: isActive ? "#F5C518" : undefined }} />
+      {!collapsed && <span className="text-[11px] font-medium flex-1">{item.label}</span>}
+      {!collapsed && item.badge != null && (
+        <span
+          className="flex h-3.5 min-w-[16px] items-center justify-center rounded-full px-1 text-[8px] font-semibold"
+          style={{
+            background: isActive ? "#F5C518" : "rgba(245,197,24,0.2)",
+            color: isActive ? "#001a1a" : "#F5C518",
+          }}
+        >
+          {item.badge}
+        </span>
+      )}
+      {isActive && (
+        <span className={`absolute ${collapsed ? "right-0.5 top-0.5" : "right-2 top-1/2 -translate-y-1/2"} text-[8px]`} style={{ color: "#F5C518" }}>●</span>
+      )}
+    </button>
+  );
+}
+
+export default function AppSidebar() {
+  const { role, name } = useAuth();
   const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const currentPath = location.hash ? location.hash.slice(1).split("?")[0] : location.pathname;
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebar_collapsed") === "true");
+
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("sidebar_collapsed", String(next));
+  };
+
+  const initials = name
+    ? name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "U";
 
   return (
     <aside
-      className="sticky top-0 h-screen shrink-0 overflow-y-auto overflow-x-hidden flex-col border-r px-2 py-3 transition-all duration-300"
-      style={{
-        display: "flex",
-        width: collapsed ? "56px" : "200px",
-        borderColor: "var(--border-color)",
-        background: "var(--bg-card)",
-      }}
+      className={`flex h-screen shrink-0 flex-col overflow-hidden transition-all duration-200 ${collapsed ? "w-[54px]" : "w-[200px]"}`}
+      style={{ background: "var(--sidebar-bg)", borderRadius: "0 12px 12px 0" }}
     >
-      {/* Header */}
-      <div className={`mb-4 flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
-        {!collapsed && (
-          <p className="truncate text-sm font-semibold leading-tight" style={{ maxWidth: "130px" }}>
-            {companyName}
-          </p>
-        )}
-        <button
-          className="btn-soft h-7 w-7 shrink-0 p-0"
-          onClick={onToggle}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <MenuIcon size={14} />
-        </button>
-      </div>
+      <Logo collapsed={collapsed} />
 
-      {/* Nav items */}
-      <nav className="space-y-0.5">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const iconColor = item.color || "var(--text-secondary)";
-
-          return (
-            <NavLink
-              key={item.route}
-              to={item.route}
-              end={item.end ?? true}
-              title={item.label}
-              className={`group flex items-center rounded-md border transition-all duration-200 ${
-                collapsed ? "justify-center px-0 py-1.5" : "gap-2 px-2 py-1.5"
-              }`}
-              style={({ isActive }) => {
-                if (!isActive) {
-                  return {
-                    color: "var(--text-secondary)",
-                    background: "transparent",
-                    borderColor: "transparent",
-                  };
-                }
-                if (isDark) {
-                  return {
-                    color: "#ffffff",
-                    background: `color-mix(in srgb, ${iconColor} 22%, var(--bg-card))`,
-                    borderColor: `color-mix(in srgb, ${iconColor} 50%, var(--border-color))`,
-                  };
-                }
-                return {
-                  color: iconColor,
-                  background: `color-mix(in srgb, ${iconColor} 10%, transparent)`,
-                  borderColor: iconColor,
-                };
-              }}
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded transition-all duration-200"
-                    style={
-                      isActive && isDark
-                        ? { color: "#ffffff", background: "transparent" }
-                        : {
-                            color: iconColor,
-                            background: `color-mix(in srgb, ${iconColor} 14%, transparent)`,
-                          }
-                    }
-                  >
-                    <Icon size={13} strokeWidth={2} />
-                  </span>
-
-                  {!collapsed && (
-                    <span
-                      className="truncate text-xs font-medium leading-tight"
-                      style={isActive && !isDark ? { color: iconColor } : undefined}
-                    >
-                      {item.label}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <SectionLabel label={section.label} collapsed={collapsed} />
+            {section.items
+              .filter((item) => item.roles.includes(role))
+              .map((item) => (
+                <NavItem
+                  key={item.label + item.route}
+                  item={item}
+                  currentPath={currentPath}
+                  searchParams={searchParams}
+                  collapsed={collapsed}
+                />
+              ))}
+          </div>
+        ))}
       </nav>
 
-      <div className="mt-auto pt-3 text-center" style={{ color: "var(--text-secondary)", fontSize: "10px" }}>
-        {!collapsed && "Powered by Eyercall"}
+      <div className={`mx-2 mb-2 mt-auto flex items-center rounded-lg px-1 py-1.5 ${collapsed ? "justify-center" : "gap-1.5 px-2"}`} style={{ background: "rgba(0,0,0,0.2)" }}>
+        <div
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+          style={{ background: "#F5C518", color: "#001a1a" }}
+        >
+          {initials}
+        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] font-medium text-white">{name || "User"}</p>
+            <p className="truncate text-[8px]" style={{ color: "#7ab0b0" }}>{role}</p>
+          </div>
+        )}
       </div>
+
+      <button
+        onClick={toggle}
+        className="mx-2 mb-3 flex items-center justify-center rounded-lg py-1.5 transition-colors hover:bg-[var(--sidebar-hover)]"
+        style={{ color: "#7ab0b0" }}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        <i className={`ti ${collapsed ? "ti-chevron-right" : "ti-chevron-left"}`} style={{ fontSize: "12px" }} />
+      </button>
     </aside>
   );
 }

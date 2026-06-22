@@ -189,7 +189,9 @@ export default function TemplatesPage() {
               </div>
               <div className="flex gap-2 pt-1">
                 <button className="btn-primary text-xs flex-1" onClick={() => setApplyTarget(t)}>Use Template</button>
-                <button className="btn-soft text-xs text-red-500" onClick={() => setDeleteTarget(t)}>Delete</button>
+                <button className="icon-btn icon-btn-danger" onClick={() => setDeleteTarget(t)} title="Delete Template">
+                  <i className="ti ti-trash" style={{ fontSize: "16px" }} />
+                </button>
               </div>
             </div>
           ))}

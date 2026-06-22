@@ -16,6 +16,7 @@ import {
   updateSupplier,
 } from "../api/credit";
 import { ActionButtons, ConfirmDialog, DataTable, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
+import { printRecord } from "../utils/print";
 import { formatPKR } from "../utils/currency";
 
 const TABS = ["overview", "customers", "suppliers", "ledger"];
@@ -310,10 +311,10 @@ export default function CreditManagementPage() {
           {tab === "overview" && summary && (
             <>
               <div className="grid gap-4 md:grid-cols-4">
-                <StatCard title="Total Receivable" value={summary.total_receivable || 0} tone="emerald" money />
-                <StatCard title="Total Payable" value={summary.total_payable || 0} tone="rose" money />
-                <StatCard title="Overdue Amount" value={summary.overdue_amount || 0} tone="amber" money />
-                <StatCard title="Recent Credits" value={summary.recent_credits || 0} />
+                <StatCard title="Total Receivable" value={summary.total_receivable || 0} tone="emerald" money icon="ti-arrow-back-up" />
+                <StatCard title="Total Payable" value={summary.total_payable || 0} tone="rose" money icon="ti-arrow-forward-up" />
+                <StatCard title="Overdue Amount" value={summary.overdue_amount || 0} tone="amber" money icon="ti-alert-triangle" />
+                <StatCard title="Recent Credits" value={summary.recent_credits || 0} icon="ti-credit-card" />
               </div>
               <DataTable
                 data={credits.slice(0, 10)}
@@ -324,11 +325,9 @@ export default function CreditManagementPage() {
                   { key: "balance", label: "Balance", render: (row) => formatPKR(row.balance || 0) },
                   { key: "status", label: "Status" },
                   { key: "view", label: "Details", render: (row) => (
-                    <div className="tooltip-wrap">
-                      <button className="icon-btn icon-btn-view" onClick={() => openDetails(row.id)} aria-label="View Details">
-                        <span className="text-xs font-medium">View</span>
-                      </button>
-                    </div>
+                    <button className="icon-btn icon-btn-view" onClick={() => openDetails(row.id)} title="View Details">
+                      <i className="ti ti-eye" style={{ fontSize: "16px" }} />
+                    </button>
                   )},
                 ]}
               />
@@ -366,6 +365,17 @@ export default function CreditManagementPage() {
                           if (tab === "customers") setEditCustomer({ ...row, opening_balance: row.opening_balance || 0 });
                           else setEditSupplier({ ...row, opening_balance: row.opening_balance || 0 });
                         }}
+                        onPrint={() => printRecord({
+                          title: `${tab === "customers" ? "Customer" : "Supplier"} Details`,
+                          fields: [
+                            { label: "Name", value: row.name },
+                            { label: "Phone", value: row.phone || "—" },
+                            { label: "Email", value: row.email || "—" },
+                            { label: "Opening Balance", value: formatPKR(row.opening_balance || 0) },
+                            { label: "Total Credit", value: formatPKR(row.total_credit || 0) },
+                            { label: "Balance", value: formatPKR(row.balance || 0) },
+                          ],
+                        })}
                         onDelete={() => promptDelete(tab, row)}
                       />
                     ),

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import api from "../api/client";
-import { Modal, PageHeader } from "../components/UI";
+import { Modal, PageHeader, StatCard } from "../components/UI";
 import { useBranding } from "../contexts/BrandingContext";
 import { generatePDF } from "../utils/reportPdf";
 
@@ -206,17 +206,10 @@ function ImportModal({ onClose }) {
           <div className="space-y-4">
             {/* Summary cards */}
             <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: "Total",    value: result.total,    cls: "text-[var(--text-primary)]" },
-                { label: "✔ Added",  value: result.inserted, cls: "text-green-600" },
-                { label: "↻ Updated",value: result.updated,  cls: "text-blue-500" },
-                { label: "✗ Failed", value: result.failed,   cls: "text-red-500" },
-              ].map((s) => (
-                <div key={s.label} className="rounded-lg border p-3 text-center" style={{ borderColor: "var(--border-color)" }}>
-                  <p className={`text-2xl font-bold ${s.cls}`}>{s.value}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{s.label}</p>
-                </div>
-              ))}
+              <StatCard title="Total"   value={result.total}   icon="ti-file-import" />
+              <StatCard title="Added"   value={result.inserted} tone="emerald" icon="ti-circle-check" />
+              <StatCard title="Updated" value={result.updated} tone="indigo" icon="ti-refresh" />
+              <StatCard title="Failed"  value={result.failed}  tone="rose" icon="ti-alert-circle" />
             </div>
 
             {/* Per-row results */}

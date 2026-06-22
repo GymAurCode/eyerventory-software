@@ -68,6 +68,19 @@ def apply_startup_migrations() -> None:
             if "updated_at" not in product_columns:
                 logger.info("Adding 'updated_at' column to products table")
                 conn.execute(text("ALTER TABLE products ADD COLUMN updated_at DATETIME"))
+            if "barcode_number" not in product_columns:
+                logger.info("Adding 'barcode_number' column to products table")
+                conn.execute(text("ALTER TABLE products ADD COLUMN barcode_number VARCHAR(20)"))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_products_barcode ON products(barcode_number) WHERE barcode_number IS NOT NULL"))
+            if "barcode_image_path" not in product_columns:
+                logger.info("Adding 'barcode_image_path' column to products table")
+                conn.execute(text("ALTER TABLE products ADD COLUMN barcode_image_path VARCHAR(255)"))
+            if "low_stock_threshold" not in product_columns:
+                logger.info("Adding 'low_stock_threshold' column to products table")
+                conn.execute(text("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER DEFAULT 10"))
+            
+            # Ensure barcode index exists for fast scanner lookups
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_barcode_scan ON products(barcode_number)"))
             
             # Add more migrations here as needed
             # Example for sales table
@@ -441,4 +454,103 @@ def _apply_purchase_migrations(conn):
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_purchase_items_purchase ON purchase_items(purchase_id)"))
         logger.info("Created purchase_items table")
 
+    # POS tables
+    _apply_pos_migrations(conn)
+
     logger.info("Purchase migrations applied")
+
+
+def _apply_pos_migrations(conn):
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+
+    if "pos_sales" not in tables:
+        conn.execute(text("""
+            CREATE TABLE pos_sales (
+                id INTEGER PRIMARY KEY,
+                bill_number VARCHAR(20) NOT NULL UNIQUE,
+                customer_id INTEGER,
+                subtotal FLOAT NOT NULL DEFAULT 0,
+                discount FLOAT NOT NULL DEFAULT 0,
+                total FLOAT NOT NULL DEFAULT 0,
+                payment_method VARCHAR(16) NOT NULL DEFAULT 'cash',
+                cash_received FLOAT,
+                change_amount FLOAT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pos_sales_bill ON pos_sales(bill_number)"))
+        logger.info("Created pos_sales table")
+
+    if "pos_sale_items" not in tables:
+        conn.execute(text("""
+            CREATE TABLE pos_sale_items (
+                id INTEGER PRIMARY KEY,
+                sale_id INTEGER NOT NULL REFERENCES pos_sales(id),
+                item_id INTEGER NOT NULL REFERENCES products(id),
+                item_name VARCHAR(120) NOT NULL,
+                qty INTEGER NOT NULL,
+                unit_price FLOAT NOT NULL,
+                total_price FLOAT NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pos_sale_items_sale ON pos_sale_items(sale_id)"))
+        logger.info("Created pos_sale_items table")
+
+    # Activity logs table
+    if "activity_logs" not in tables:
+        conn.execute(text("""
+            CREATE TABLE activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                action_type VARCHAR(50) NOT NULL,
+                description TEXT NOT NULL,
+                reference_id INTEGER,
+                reference_type VARCHAR(50),
+                amount DECIMAL(10,2),
+                created_by VARCHAR(100) NOT NULL DEFAULT 'system',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_activity_logs_type ON activity_logs(action_type)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_activity_logs_created ON activity_logs(created_at)"))
+        logger.info("Created activity_logs table")
+
+    # Add low_stock_threshold to products table
+    product_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(products)")).fetchall()]
+    if "low_stock_threshold" not in product_columns:
+        conn.execute(text("ALTER TABLE products ADD COLUMN low_stock_threshold INTEGER NOT NULL DEFAULT 10"))
+        logger.info("Added 'low_stock_threshold' column to products table")
+
+    # POS table migrations
+    if "pos_sales" in tables:
+        pos_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(pos_sales)")).fetchall()]
+        if "status" not in pos_cols:
+            conn.execute(text("ALTER TABLE pos_sales ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'completed'"))
+            logger.info("Added 'status' column to pos_sales table")
+
+    if "sale_returns" not in tables:
+        conn.execute(text("""
+            CREATE TABLE sale_returns (
+                id INTEGER PRIMARY KEY,
+                sale_id INTEGER NOT NULL REFERENCES pos_sales(id),
+                reason VARCHAR(255),
+                total_refund FLOAT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_returns_sale ON sale_returns(sale_id)"))
+        logger.info("Created sale_returns table")
+
+    if "sale_return_items" not in tables:
+        conn.execute(text("""
+            CREATE TABLE sale_return_items (
+                id INTEGER PRIMARY KEY,
+                return_id INTEGER NOT NULL REFERENCES sale_returns(id),
+                item_id INTEGER NOT NULL REFERENCES products(id),
+                item_name VARCHAR(120) NOT NULL,
+                qty INTEGER NOT NULL,
+                unit_price FLOAT NOT NULL,
+                total_price FLOAT NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_return_items_return ON sale_return_items(return_id)"))
+        logger.info("Created sale_return_items table")

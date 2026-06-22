@@ -64,13 +64,13 @@ export default function AIIntelligencePage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="cursor-pointer" onClick={() => navigate("/ai-intelligence/low-stock")}>
-          <StatCard title="Low Stock Alerts" value={loading ? "…" : lowStockCount} tone="rose" />
+          <StatCard title="Low Stock Alerts" value={loading ? "…" : lowStockCount} tone="rose" icon="ti-alert-triangle" />
         </div>
         <div className="cursor-pointer" onClick={() => navigate("/ai-intelligence/predictions-risk")}>
-          <StatCard title="Predictions at Risk (14d)" value={loading ? "…" : riskyPredictions} tone="amber" />
+          <StatCard title="Predictions at Risk (14d)" value={loading ? "…" : riskyPredictions} tone="amber" icon="ti-alert-octagon" />
         </div>
         <div className="cursor-pointer" onClick={() => navigate("/ai-intelligence/anomalies")}>
-          <StatCard title="Anomalies Detected" value={loading ? "…" : anomalyCount} tone="indigo" />
+          <StatCard title="Anomalies Detected" value={loading ? "…" : anomalyCount} tone="indigo" icon="ti-bug" />
         </div>
       </div>
 
@@ -98,11 +98,6 @@ export default function AIIntelligencePage() {
         {queryResult && !queryResult.error && (
           <div className="space-y-2">
             <p className="text-xs text-[var(--text-muted)]">{queryResult.explanation}</p>
-            {queryResult.sql && (
-              <pre className="overflow-auto rounded bg-[var(--surface-2,rgba(0,0,0,0.04))] px-3 py-2 text-xs font-mono">
-                {queryResult.sql}
-              </pre>
-            )}
             {queryResult.rows?.length > 0 ? (
               <div className="overflow-auto rounded-lg border" style={{ borderColor: "var(--border-color)" }}>
                 <table className="w-full text-xs">

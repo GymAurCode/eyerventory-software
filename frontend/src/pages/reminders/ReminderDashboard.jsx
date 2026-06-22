@@ -73,9 +73,9 @@ export default function ReminderDashboard({ onNavigate }) {
     <div className="space-y-5">
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard title="Today Total" value={stats?.today_total ?? 0} tone="indigo" />
-        <StatCard title="Today Completed" value={stats?.today_completed ?? 0} tone="emerald" />
-        <StatCard title="Today Pending" value={stats?.today_pending ?? 0} tone="amber" />
+        <StatCard title="Today Total" value={stats?.today_total ?? 0} tone="indigo" icon="ti-calendar" />
+        <StatCard title="Today Completed" value={stats?.today_completed ?? 0} tone="emerald" icon="ti-check" />
+        <StatCard title="Today Pending" value={stats?.today_pending ?? 0} tone="amber" icon="ti-clock" />
       </div>
 
       {/* Quick create */}

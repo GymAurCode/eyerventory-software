@@ -1,144 +1,241 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "../contexts/ThemeContext";
+import { StatCard } from "../components/UI";
 import api from "../api/client";
-import { PageHeader, StatCard } from "../components/UI";
-import { useAuth } from "../contexts/AuthContext";
-import { formatPKR } from "../utils/currency";
 
-const QUICK_ACTIONS = [
-  { label: "New Sale", path: "/sales", color: "#6366F1" },
-  { label: "Add Product", path: "/products", color: "#22C55E" },
-  { label: "Log Expense", path: "/expenses", color: "#F59E0B" },
-  { label: "View Reports", path: "/reports", color: "#06B6D4" },
-];
-
-function QuickActions() {
-  const navigate = useNavigate();
-  return (
-    <section className="panel">
-      <p className="mb-4 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>Quick Actions</p>
-      <div className="grid grid-cols-2 gap-3">
-        {QUICK_ACTIONS.map((action) => (
-          <button
-            key={action.label}
-            onClick={() => navigate(action.path)}
-            className="rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all hover:opacity-80 active:scale-95"
-            style={{
-              borderColor: action.color + "44",
-              background: action.color + "18",
-              color: action.color,
-            }}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
 }
 
-function ActivityItem({ icon, label, sub, amount, tone }) {
-  const colors = { sale: "#22C55E", expense: "#EF4444", product: "#6366F1" };
-  const color = colors[tone] || "#6366F1";
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  return new Date(dateStr).toISOString().slice(0, 10) === todayStr();
+}
+
+const ACTION_COLORS = {
+  sale: { dot: "🟢", icon: "ti-receipt" },
+  purchase: { dot: "🔵", icon: "ti-shopping-cart" },
+  item_added: { dot: "🔵", icon: "ti-box" },
+  item_updated: { dot: "⚪", icon: "ti-edit" },
+  item_deleted: { dot: "🔴", icon: "ti-trash" },
+  return: { dot: "🟠", icon: "ti-receipt-refund" },
+  low_stock: { dot: "🟠", icon: "ti-alert-triangle" },
+  customer_added: { dot: "🔵", icon: "ti-user-plus" },
+};
+
+function RecentActivities() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const intervalRef = useRef(null);
+
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await api.get("/activities?limit=20");
+      setActivities(res.data);
+      setError(false);
+    } catch {
+      setError(true);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchActivities();
+    intervalRef.current = setInterval(fetchActivities, 30000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [fetchActivities]);
+
   return (
-    <div className="flex items-center gap-3 py-2.5">
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-        style={{ background: color + "22", color }}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{label}</p>
-        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{sub}</p>
+    <div
+      className="rounded-xl p-4"
+      style={{
+        background: isDark ? "#0d2020" : "#ffffff",
+        border: "0.5px solid",
+        borderColor: isDark ? "rgba(0,128,128,0.22)" : "#c0d8d8",
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <i className="ti ti-clock" style={{ color: "#008080", fontSize: "14px" }} />
+          <span className="text-xs font-medium" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>Recent Activities</span>
+        </div>
+        <button
+          className="text-xs hover:opacity-70 transition-opacity"
+          style={{ color: "var(--text-secondary)" }}
+          onClick={fetchActivities}
+          title="Refresh"
+        >
+          <i className="ti ti-refresh" style={{ fontSize: "12px" }} /> Refresh
+        </button>
       </div>
-      {amount != null && (
-        <span className="shrink-0 text-sm font-semibold" style={{ color }}>
-          {amount}
-        </span>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-10 rounded-lg animate-pulse" style={{ background: isDark ? "rgba(0,128,128,0.08)" : "rgba(0,0,0,0.04)" }} />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="py-4 text-center">
+          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Could not load activities</p>
+          <button className="mt-2 text-xs font-medium text-indigo-400 hover:text-indigo-300" onClick={fetchActivities}>
+            <i className="ti ti-refresh mr-1" />Retry
+          </button>
+        </div>
+      ) : activities.length === 0 ? (
+        <p className="py-4 text-center text-xs" style={{ color: "var(--text-secondary)" }}>No recent activity</p>
+      ) : (
+        <div className="space-y-1 max-h-80 overflow-y-auto">
+          {activities.map((act) => {
+            const meta = ACTION_COLORS[act.action_type] || { dot: "⚪", icon: "ti-info-circle" };
+            return (
+              <div
+                key={act.id}
+                className="flex items-start gap-2 rounded-lg px-3 py-2 text-xs transition-colors hover:bg-[var(--bg-hover)]"
+              >
+                <span className="shrink-0 mt-0.5">{meta.dot}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate" style={{ color: "var(--text-primary)" }}>{act.description}</p>
+                  <p style={{ color: "var(--text-secondary)" }}>{act.time_ago}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
 }
 
-function RecentActivity({ sales, expenses }) {
-  const items = [
-    ...sales.slice(-8).map((s) => ({
-      key: `sale-${s.id}`,
-      icon: "S",
-      tone: "sale",
-      label: `Sale #${s.id}`,
-      sub: s.created_at ? new Date(s.created_at).toLocaleDateString() : "—",
-      amount: formatPKR(s.revenue ?? s.selling_price * s.quantity),
-      ts: s.created_at,
-    })),
-    ...expenses.slice(-8).map((e) => ({
-      key: `exp-${e.id}`,
-      icon: "E",
-      tone: "expense",
-      label: e.description || e.category || `Expense #${e.id}`,
-      sub: e.expense_date ? new Date(e.expense_date).toLocaleDateString() : "—",
-      amount: formatPKR(e.amount),
-      ts: e.expense_date,
-    })),
-  ]
-    .sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0))
-    .slice(0, 8);
+const QUICK_ACTIONS = [
+  { label: "Add Product",   icon: "ti-box",              color: "#008080", route: "/products" },
+  { label: "POS / Billing", icon: "ti-receipt",          color: "#F5C518", route: "/pos" },
+  { label: "Add Supplier",  icon: "ti-truck",            color: "#008080", route: "/credit" },
+  { label: "Sales",         icon: "ti-clipboard-list",   color: "#F5C518", route: "/sales" },
+  { label: "Scan Barcode",  icon: "ti-scan",             color: "#008080", route: "/pos" },
+  { label: "View Reports",  icon: "ti-chart-bar",        color: "#F5C518", route: "/analytics" },
+];
+
+function QuickActions() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const navigate = useNavigate();
 
   return (
-    <section className="panel">
-      <p className="mb-2 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>Recent Activity</p>
-      {items.length === 0 ? (
-        <p className="py-6 text-center text-sm" style={{ color: "var(--text-secondary)" }}>No recent activity</p>
-      ) : (
-        <div className="divide-y overflow-y-auto" style={{ borderColor: "var(--border-color)", maxHeight: "364px" }}>
-          {items.map(({ key, ...rest }) => (
-            <ActivityItem key={key} {...rest} />
-          ))}
-        </div>
-      )}
-    </section>
+    <div
+      className="rounded-xl p-4"
+      style={{
+        background: isDark ? "#0d2020" : "#ffffff",
+        border: "0.5px solid",
+        borderColor: isDark ? "rgba(0,128,128,0.22)" : "#c0d8d8",
+      }}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <i className="ti ti-bolt" style={{ color: "#F5C518", fontSize: "14px" }} />
+        <span className="text-xs font-medium" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>Quick Actions</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {QUICK_ACTIONS.map((action) => (
+          <button
+            key={action.label}
+            onClick={() => navigate(action.route)}
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-all duration-150"
+            style={{
+              color: isDark ? "#c0efef" : "#002a2a",
+              border: "0.5px solid transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = isDark ? "rgba(245,197,24,0.08)" : "rgba(0,128,128,0.06)";
+              e.currentTarget.style.borderColor = isDark ? "rgba(245,197,24,0.15)" : "rgba(0,128,128,0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.borderColor = "transparent";
+            }}
+          >
+            <div
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
+              style={{ background: action.color + (isDark ? "22" : "11") }}
+            >
+              <i className={`ti ${action.icon}`} style={{ fontSize: "13px", color: action.color }} />
+            </div>
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
 export default function DashboardPage() {
-  const { role } = useAuth();
-  const [summary, setSummary] = useState({ total_revenue: 0, total_profit: 0, total_expenses: 0 });
-  const [products, setProducts] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [expenses, setExpenses] = useState([]);
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [stats, setStats] = useState([
+    { title: "Total Items",   value: 0, icon: "ti-box",              color: "#008080", trend: null, trendUp: true  },
+    { title: "Stock Value",   value: 0, icon: "ti-currency-dollar", color: "#F5C518", trend: null, trendUp: true, money: true },
+    { title: "Low Stock",     value: 0, icon: "ti-alert-triangle",   color: "#ef4444", trend: null, trendUp: false },
+    { title: "Orders Today",  value: 0, icon: "ti-clipboard-check", color: "#008080", trend: null, trendUp: true  },
+  ]);
 
   useEffect(() => {
-    const requests = [api.get("/finance/summary"), api.get("/products")];
-    if (role === "owner") {
-      requests.push(api.get("/sales"), api.get("/expenses"));
+    let cancelled = false;
+
+    async function fetchData() {
+      try {
+        const [prodRes, salesRes] = await Promise.all([
+          api.get("/products"),
+          api.get("/sales"),
+        ]);
+
+        if (cancelled) return;
+
+        const products = Array.isArray(prodRes.data) ? prodRes.data : [];
+        const sales = Array.isArray(salesRes.data) ? salesRes.data : [];
+
+        const totalItems = products.length;
+        const stockValue = products.reduce((sum, p) => sum + (Number(p.stock) * Number(p.cost_price || 0)), 0);
+        const lowStock = products.filter((p) => Number(p.stock) < 10).length;
+        const ordersToday = sales.filter((s) => isToday(s.created_at)).length;
+
+        setStats([
+          { title: "Total Items",   value: totalItems, icon: "ti-box",              color: "#008080", trend: null, trendUp: true  },
+          { title: "Stock Value",   value: stockValue, icon: "ti-currency-dollar", color: "#F5C518", trend: null, trendUp: true, money: true },
+          { title: "Low Stock",     value: lowStock,   icon: "ti-alert-triangle",   color: "#ef4444", trend: null, trendUp: false },
+          { title: "Orders Today",  value: ordersToday, icon: "ti-clipboard-check", color: "#008080", trend: null, trendUp: true  },
+        ]);
+      } catch {
+        // backend not ready
+      }
     }
-    Promise.all(requests)
-      .then(([fin, prod, salesRes, expRes]) => {
-        setSummary(fin.data);
-        setProducts(prod.data || []);
-        if (salesRes) setSales(salesRes.data || []);
-        if (expRes) setExpenses(expRes.data || []);
-      })
-      .catch(() => undefined);
-  }, [role]);
+
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle="Operational metrics and financial overview" />
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {role === "owner" && <StatCard title="Revenue" value={summary.total_revenue} tone="indigo" money />}
-        {role === "owner" && <StatCard title="Profit" value={summary.total_profit} tone="emerald" money />}
-        {role === "owner" && <StatCard title="Expenses" value={summary.total_expenses} tone="rose" money />}
-        <StatCard title="Products" value={products.length} tone="amber" />
+    <div className="p-[18px] space-y-[14px]">
+      <div>
+        <h1 className="text-lg font-medium" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>Dashboard</h1>
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Inventory overview and key metrics</p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          {role === "owner" && <RecentActivity sales={sales} expenses={expenses} />}
+      <div className="grid grid-cols-4 gap-3">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} {...stat} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-5 gap-3">
+        <div className="col-span-3">
+          <RecentActivities />
         </div>
-        <div className="space-y-4">
+        <div className="col-span-2">
           <QuickActions />
         </div>
       </div>

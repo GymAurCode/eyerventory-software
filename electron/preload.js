@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   backupCreate: () => ipcRenderer.invoke("backup:create"),
   backupRestore: () => ipcRenderer.invoke("backup:restore"),
   setAutoBackup: (enabled) => ipcRenderer.invoke("backup:setAuto", enabled),
+  printReceipt: (saleData) => ipcRenderer.invoke("print-receipt", saleData),
 });
 
 // License API — exposed as window.licenseAPI

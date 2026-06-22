@@ -310,4 +310,7 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+# Generated barcode images
+barcodes/
+
 # End of https://www.toptal.com/developers/gitignore/api/node,python

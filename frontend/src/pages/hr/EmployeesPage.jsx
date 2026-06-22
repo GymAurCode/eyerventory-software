@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Eye, RotateCcw } from "lucide-react";
+// lucide-react replaced with Tabler Icons via CDN
 import { toast } from "sonner";
 import { createEmployee, getEmployees, updateEmployee } from "../../api/hr";
 import { ActionButtons, ConfirmDialog, DataTable, Modal, PageHeader } from "../../components/UI";
+import { printRecord } from "../../utils/print";
 
 const EMPTY_FORM = {
   name: "", cnic: "", phone: "", role: "staff",
@@ -119,22 +120,27 @@ export default function EmployeesPage() {
         <ActionButtons
           onView={() => setViewTarget(r)}
           onEdit={() => openEdit(r)}
+          onPrint={() => printRecord({
+            title: "Employee Details",
+            fields: [
+              { label: "Name", value: r.name },
+              { label: "CNIC", value: r.cnic || "—" },
+              { label: "Phone", value: r.phone || "—" },
+              { label: "Role", value: r.role },
+              { label: "Type", value: r.employment_type || "—" },
+              { label: "Salary", value: r.salary ? `PKR ${Number(r.salary).toLocaleString()}` : "—" },
+            ],
+          })}
           onDelete={() => setDeleteTarget(r)}
         />
       ) : (
-        <div className="flex justify-end gap-1.5">
-          <div className="tooltip-wrap">
-            <button className="icon-btn icon-btn-view" onClick={() => setViewTarget(r)} aria-label="View Details">
-              <Eye size={15} />
-            </button>
-            <span className="tooltip-text">View Details</span>
-          </div>
-          <div className="tooltip-wrap">
-            <button className="icon-btn" style={{ color: "var(--text-secondary)" }} onClick={() => handleRestore(r)} aria-label="Restore Employee">
-              <RotateCcw size={15} />
-            </button>
-            <span className="tooltip-text">Restore</span>
-          </div>
+        <div className="flex justify-end gap-1">
+          <button className="icon-btn icon-btn-view" onClick={() => setViewTarget(r)} title="View Details">
+            <i className="ti ti-eye" style={{ fontSize: "16px" }} />
+          </button>
+          <button className="icon-btn" onClick={() => handleRestore(r)} title="Restore Employee">
+            <i className="ti ti-rotate-clockwise-2" style={{ fontSize: "16px" }} />
+          </button>
         </div>
       ),
     },
