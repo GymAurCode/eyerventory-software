@@ -23,17 +23,42 @@ from backend.models.journal import JournalEntry, JournalItem
 # Default Chart of Accounts (code → name, type)
 # ---------------------------------------------------------------------------
 DEFAULT_ACCOUNTS = [
-    ("1001", "Cash on Hand",          "asset"),
-    ("1002", "Bank",                  "asset"),
-    ("1100", "Accounts Receivable",   "asset"),
-    ("1200", "Inventory",             "asset"),
-    ("2001", "Accounts Payable",      "liability"),
-    ("2100", "Salary Payable",        "liability"),
-    ("4001", "Sales Revenue",         "revenue"),
-    ("5001", "Cost of Goods Sold",    "expense"),
-    ("5002", "Salaries Expense",      "expense"),
-    ("5003", "Operational Expenses",  "expense"),
+    ("1001", "Cash on Hand",              "asset"),
+    ("1002", "Bank",                      "asset"),
+    ("1003", "Petty Cash Account",        "asset"),
+    ("1100", "Accounts Receivable",       "asset"),
+    ("1200", "Inventory",                 "asset"),
+    ("2001", "Accounts Payable",          "liability"),
+    ("2100", "Salary Payable",            "liability"),
+    ("2200", "Employee Payable Account",  "liability"),
+    ("4001", "Sales Revenue",             "revenue"),
+    ("5001", "Cost of Goods Sold",        "expense"),
+    ("5002", "Salaries Expense",          "expense"),
+    ("5003", "Operational Expenses",      "expense"),
 ]
+
+# Expense Type → GL Account Name mapping
+EXPENSE_TYPE_GL_MAP = {
+    "Petrol / Fuel":         "Fuel & Conveyance Expense",
+    "Vehicle Maintenance":   "Vehicle Maintenance Expense",
+    "Toll / Parking":        "Conveyance Expense",
+    "Labour / Loading":      "Labour Expense",
+    "Food / Meals":          "Meals & Entertainment Expense",
+    "Office Supplies":       "Office Supplies Expense",
+    "Electricity":           "Utilities Expense",
+    "Rent":                  "Rent Expense",
+    "Salary":                "Salary Expense",
+    "Repair":                "Repair & Maintenance Expense",
+    "Other":                 "Miscellaneous Expense",
+}
+
+# Payment Method → Credit Account mapping
+PAYMENT_METHOD_CREDIT_ACCOUNT = {
+    "cash":           ("Petty Cash Account",        "asset"),
+    "bank":           ("Bank",                      "asset"),
+    "employee_paid":  ("Employee Payable Account",  "liability"),
+    "credit":         ("Accounts Payable",          "liability"),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -311,23 +336,42 @@ def record_customer_payment(
 def record_expense(
     db: Session,
     expense_id: int,
-    amount: float,
-    category: str = "",
+    voucher_no: str,
+    items: list[dict],
+    payment_method: str,
+    total_amount: float,
 ) -> JournalEntry:
     """
-    Operational expense:
-        DR Operational Expenses   amount
-        CR Cash on Hand           amount
+    Multi-item expense — each item generates a DR line to its mapped GL account.
+    Single CR line to the payment method account.
+
+    items: [{"expense_type": str, "amount": float, "description": str|None}]
     """
+    credit_account_name, credit_account_type = PAYMENT_METHOD_CREDIT_ACCOUNT.get(
+        payment_method, ("Petty Cash Account", "asset")
+    )
+
+    entries = []
+    for item in items:
+        gl_name = EXPENSE_TYPE_GL_MAP.get(item["expense_type"], "Miscellaneous Expense")
+        entries.append({
+            "account_name": gl_name,
+            "account_type": "expense",
+            "debit": float(item["amount"]),
+            "credit": 0.0,
+        })
+
+    entries.append({
+        "account_name": credit_account_name,
+        "account_type": credit_account_type,
+        "debit": 0.0,
+        "credit": total_amount,
+    })
+
     return create_journal_entry(
         db,
-        f"Expense — {category}" if category else f"Expense #{expense_id}",
-        [
-            {"account_name": "Operational Expenses", "account_type": "expense",
-             "debit": amount, "credit": 0.0},
-            {"account_name": "Cash on Hand", "account_type": "asset",
-             "debit": 0.0, "credit": amount},
-        ],
+        f"Expense — {voucher_no}" if voucher_no else f"Expense #{expense_id}",
+        entries,
         reference_type="expense",
         reference_id=expense_id,
     )

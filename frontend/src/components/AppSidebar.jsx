@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
 import { NAV_SECTIONS } from "../config/navigation";
 
 function Logo({ collapsed }) {
   return (
-    <div className={`flex items-center gap-3 px-4 pt-4 pb-4 ${collapsed ? "justify-center" : ""}`}>
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F5C518]">
-        <i className="ti ti-eye text-[#001a1a]" style={{ fontSize: "16px" }} />
+    <div className={`flex items-center gap-3 px-3 pt-2.5 pb-2.5 ${collapsed ? "justify-center" : ""}`}>
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#F5C518]">
+        <i className="ti ti-eye text-[#001a1a]" style={{ fontSize: "14px" }} />
       </div>
       {!collapsed && (
         <div>
@@ -21,10 +20,10 @@ function Logo({ collapsed }) {
 }
 
 function SectionLabel({ label, collapsed }) {
-  if (collapsed) return <div className="h-2" />;
+  if (collapsed) return <div className="h-1" />;
   return (
     <p
-      className="px-4 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-[1.5px]"
+      className="px-3 pt-1.5 pb-0.5 text-[8px] font-semibold uppercase tracking-[1.5px]"
       style={{ color: "rgba(255,255,255,0.25)" }}
     >
       {label}
@@ -50,7 +49,7 @@ function NavItem({ item, currentPath, searchParams, collapsed }) {
     <button
       onClick={() => navigate(route)}
       title={collapsed ? item.label : undefined}
-      className={`group relative flex w-full items-center text-left transition-all duration-150 ${collapsed ? "justify-center px-2 py-2" : "gap-3 px-4 py-1.5"}`}
+      className={`group relative flex w-full items-center text-left transition-all duration-150 ${collapsed ? "justify-center px-2 py-1.5" : "gap-2 px-3 py-1.5"}`}
       style={{
         color: isActive ? "#F5C518" : "var(--sidebar-text)",
       }}
@@ -82,8 +81,7 @@ function NavItem({ item, currentPath, searchParams, collapsed }) {
 }
 
 export default function AppSidebar() {
-  const { role, name } = useAuth();
-  const { theme } = useTheme();
+  const { role, name, logout } = useAuth();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const currentPath = location.hash ? location.hash.slice(1).split("?")[0] : location.pathname;
@@ -101,8 +99,8 @@ export default function AppSidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col overflow-hidden transition-all duration-200 ${collapsed ? "w-[54px]" : "w-[200px]"}`}
-      style={{ background: "var(--sidebar-bg)", borderRadius: "0 12px 12px 0" }}
+      className={`flex h-full shrink-0 flex-col overflow-hidden transition-all duration-200 ${collapsed ? "w-[52px]" : "w-[190px]"}`}
+      style={{ background: "var(--sidebar-bg)", borderRadius: "12px" }}
     >
       <Logo collapsed={collapsed} />
 
@@ -125,29 +123,43 @@ export default function AppSidebar() {
         ))}
       </nav>
 
-      <div className={`mx-2 mb-2 mt-auto flex items-center rounded-lg px-1 py-1.5 ${collapsed ? "justify-center" : "gap-1.5 px-2"}`} style={{ background: "rgba(0,0,0,0.2)" }}>
+      <div className={`mx-2 mb-0.5 mt-auto flex items-center rounded-lg px-1 py-1 ${collapsed ? "justify-center" : "gap-1.5 px-2"}`} style={{ background: "rgba(0,0,0,0.2)" }}>
         <div
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold"
           style={{ background: "#F5C518", color: "#001a1a" }}
         >
           {initials}
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-medium text-white">{name || "User"}</p>
-            <p className="truncate text-[8px]" style={{ color: "#7ab0b0" }}>{role}</p>
+            <p className="truncate text-[9px] font-medium text-white">{name || "User"}</p>
+            <p className="truncate text-[7px]" style={{ color: "#7ab0b0" }}>{role}</p>
           </div>
         )}
+        <button
+          onClick={logout}
+          className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-[var(--sidebar-hover)]"
+          style={{ color: "#7ab0b0" }}
+          title="Sign out"
+        >
+          <i className="ti ti-logout" style={{ fontSize: "13px" }} />
+        </button>
       </div>
 
       <button
         onClick={toggle}
-        className="mx-2 mb-3 flex items-center justify-center rounded-lg py-1.5 transition-colors hover:bg-[var(--sidebar-hover)]"
+        className="mx-2 mb-1 flex items-center justify-center rounded-lg py-1 transition-colors hover:bg-[var(--sidebar-hover)]"
         style={{ color: "#7ab0b0" }}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <i className={`ti ${collapsed ? "ti-chevron-right" : "ti-chevron-left"}`} style={{ fontSize: "12px" }} />
+        <i className={`ti ${collapsed ? "ti-chevron-right" : "ti-chevron-left"}`} style={{ fontSize: "11px" }} />
       </button>
+
+      {!collapsed && (
+        <p className="pb-2 text-center text-[7px] uppercase tracking-[1.5px]" style={{ color: "rgba(245,197,24,0.5)" }}>
+          Powered by <strong style={{ color: "#F5C518" }}>Eyercall</strong>
+        </p>
+      )}
     </aside>
   );
 }

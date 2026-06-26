@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api from "../api/client";
 import { posApi } from "../api/pos";
+import AddProductDialog from "../components/AddProductDialog";
 import { ActionButtons, ConfirmDialog, DataTable, EmptyState, LoadingSkeleton, Modal, PageHeader, StatCard } from "../components/UI";
 import { useAuth } from "../contexts/AuthContext";
 import { useShortcuts } from "../contexts/ShortcutContext";
@@ -151,6 +152,7 @@ export default function ProductsPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [editingId, setEditingId] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -209,9 +211,7 @@ export default function ProductsPage() {
   };
 
   const openCreate = () => {
-    setEditingId(0);
-    reset();
-    setOpen(true);
+    setShowAddDialog(true);
   };
 
   const openEdit = (row) => {
@@ -543,6 +543,12 @@ export default function ProductsPage() {
           searchableColumns={["name", "cost_price", "stock", "barcode_number"]}
         />
       )}
+
+      <AddProductDialog
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onSuccess={() => { setShowAddDialog(false); load(); }}
+      />
 
       <Modal title={editingId ? "Edit Product" : "Add Product"} open={open} onClose={() => setOpen(false)}>
         <form className="grid grid-cols-1 gap-3" onSubmit={submit}>

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.routes.deps import get_current_user
-from backend.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse
+from backend.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserResponse
 from backend.services.auth_service import login
 from backend.services import auth_service
 
@@ -17,6 +17,11 @@ def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     token, role, name = result
     return TokenResponse(access_token=token, role=role, name=name)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_current_user_info(user=Depends(get_current_user)):
+    return UserResponse(id=user.id, name=user.name, email=user.email, role=user.role)
 
 
 @router.post("/change-password")

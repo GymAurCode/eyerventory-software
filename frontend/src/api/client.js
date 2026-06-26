@@ -49,7 +49,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// On 401, clear session and redirect to login
+// On 401, clear session — AuthProvider listens for this event to show LoginPage
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -57,7 +57,7 @@ api.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("role");
       localStorage.removeItem("name");
-      window.location.href = "/";
+      window.dispatchEvent(new CustomEvent("auth:unauthorized"));
     }
     return Promise.reject(err);
   }

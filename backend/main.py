@@ -19,9 +19,10 @@ from backend.initDb import apply_startup_migrations
 from backend.models.user import User
 from backend.models.owner_share import OwnerShare
 from backend.routes import (
-    accounting, activities, ai, attendance, auth, credits, customers, employees,
-    expenses, finance, hr_payments, ledger, leaves, partners, payments, payroll,
-    pos, products, purchases, reminders, reports, sales, settings, suppliers, users,
+    accounting, activities, ai, attendance, auth, credits, customers, devices,
+    employees, expenses, finance, hr_payments, import_export, ledger, leaves, partners, payments,
+    payroll, pos, product_add, products, purchases, reminders, reports, sales, settings,
+    suppliers, users, warehouses,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -87,6 +88,7 @@ async def logging_middleware(request: Request, call_next):
 # Routers
 # ---------------------------------------------------------------------------
 app.include_router(auth.router,       prefix="/api")
+app.include_router(product_add.router, prefix="/api")
 app.include_router(products.router,   prefix="/api")
 app.include_router(purchases.router,  prefix="/api")
 app.include_router(sales.router,      prefix="/api")
@@ -111,6 +113,9 @@ app.include_router(ai.router,         prefix="/api")
 app.include_router(reminders.router,  prefix="/api")
 app.include_router(activities.router, prefix="/api")
 app.include_router(pos.router,        prefix="/api")
+app.include_router(devices.router,        prefix="/api")
+app.include_router(warehouses.router,    prefix="/api")
+app.include_router(import_export.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["health"])

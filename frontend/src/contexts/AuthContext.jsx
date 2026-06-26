@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api, { setToken } from "../api/client";
 
 const AuthContext = createContext(null);
@@ -8,8 +8,51 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(localStorage.getItem("role") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "");
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(() => !!localStorage.getItem("token"));
 
   if (token) setToken(token);
+
+  // Validate stored token on mount — if invalid, clear session and show login
+  useEffect(() => {
+    const storedToken = localStorage.getItem("token");
+    if (!storedToken) {
+      setValidating(false);
+      return;
+    }
+
+    let cancelled = false;
+    api.get("/auth/me")
+      .then(() => {
+        if (!cancelled) setValidating(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.response?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("role");
+          localStorage.removeItem("name");
+          setAuthToken("");
+          setRole("");
+          setName("");
+          setToken("");
+        }
+        setValidating(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Listen for 401 events from the API interceptor (session expired mid-use)
+  useEffect(() => {
+    const handler = () => {
+      setAuthToken("");
+      setRole("");
+      setName("");
+      setToken("");
+    };
+    window.addEventListener("auth:unauthorized", handler);
+    return () => window.removeEventListener("auth:unauthorized", handler);
+  }, []);
 
   const login = async (email, password) => {
     setLoading(true);
@@ -50,7 +93,10 @@ export function AuthProvider({ children }) {
     setToken("");
   };
 
-  const value = useMemo(() => ({ token, role, name, login, logout, loading }), [token, role, name, loading]);
+  const value = useMemo(
+    () => ({ token, role, name, login, logout, loading, validating }),
+    [token, role, name, loading, validating],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

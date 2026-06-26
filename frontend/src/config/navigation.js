@@ -14,6 +14,8 @@ export const NAV_SECTIONS = [
       { label: "Sales",        route: "/sales",     icon: "ti-clipboard-list",  roles: ["owner", "staff"], end: true },
       { label: "Credit Sales", route: "/credit",    icon: "ti-credit-card",     roles: ["owner", "staff"], end: true },
       { label: "Expenses",     route: "/expenses",  icon: "ti-currency-dollar", roles: ["owner", "staff"], end: true },
+      { label: "Warehouses",   route: "/warehouses", icon: "ti-building-warehouse", roles: ["owner", "staff"], end: true },
+      { label: "Devices",      route: "/devices",   icon: "ti-device-desktop",  roles: ["owner", "staff"], end: true },
     ],
   },
   {

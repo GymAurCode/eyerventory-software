@@ -24,7 +24,9 @@ import POSPage from "./pages/POSPage";
 import SalesPage from "./pages/SalesPage";
 import SettingsPage from "./pages/SettingsPage";
 import CreditManagementPage from "./pages/CreditManagementPage";
+import DevicesPage from "./pages/DevicesPage";
 import HRManagementPage from "./pages/hr/HRManagementPage";
+import WarehousePage from "./pages/WarehousePage";
 
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const AIIntelligencePage = lazy(() => import("./pages/AIIntelligencePage"));
@@ -40,7 +42,7 @@ function ProtectedRoute({ allow, children }) {
 }
 
 function Layout() {
-  const { token, logout, role, name } = useAuth();
+  const { token, logout, role, name, validating } = useAuth();
   const { companyName } = useBranding();
   const { toggleTheme, theme } = useTheme();
   const [showPalette, setShowPalette] = useState(false);
@@ -92,6 +94,7 @@ function Layout() {
     if (actionId === "nav.sales") return navigate("/sales"), true;
     if (actionId === "nav.credit") return navigate("/credit"), true;
     if (actionId === "nav.expenses") return navigate("/expenses"), true;
+    if (actionId === "nav.devices") return navigate("/devices"), true;
     if (actionId === "nav.finance" && role === "owner") return navigate("/finance"), true;
     if (actionId === "nav.ledger" && role === "owner") return navigate("/finance?tab=ledger"), true;
     if (actionId === "nav.analytics" && role === "owner") return navigate("/analytics"), true;
@@ -133,15 +136,16 @@ function Layout() {
     }
   }, []);
 
+  if (validating) return null;
   if (!token) return <LoginPage />;
 
   const shortcutApi = { registerPageAction, triggerAction, activeActionId, formatShortcut };
 
   return (
     <ShortcutProvider value={shortcutApi}>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden p-2 gap-2">
         <AppSidebar />
-        <div className="flex min-w-0 flex-1 flex-col ml-2 mr-2 my-2 rounded-xl overflow-hidden" style={{ background: "var(--bg-app)" }}>
+        <div className="flex min-w-0 flex-1 flex-col rounded-xl overflow-hidden" style={{ background: "var(--bg-app)" }}>
           <header className="flex h-14 items-center justify-between px-3" style={{ background: "var(--bg-card)", borderBottom: "0.5px solid var(--border-color)", borderRadius: "12px" }}>
             <div className="flex items-center gap-3">
               <h1 className="text-base font-medium" style={{ color: isDark ? "#c0efef" : "#002a2a" }}>{companyName || "EyerFlow"}</h1>
@@ -237,7 +241,9 @@ function Layout() {
                 <Route path="/sales" element={<ProtectedRoute allow={["owner", "staff"]}><SalesPage /></ProtectedRoute>} />
                 <Route path="/purchases" element={<ProtectedRoute allow={["owner", "staff"]}><PurchasesPage /></ProtectedRoute>} />
                 <Route path="/credit" element={<ProtectedRoute allow={["owner", "staff"]}><CreditManagementPage /></ProtectedRoute>} />
+                <Route path="/devices" element={<ProtectedRoute allow={["owner", "staff"]}><DevicesPage /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute allow={["owner", "staff"]}><ExpensesPage /></ProtectedRoute>} />
+                <Route path="/warehouses" element={<ProtectedRoute allow={["owner", "staff"]}><WarehousePage /></ProtectedRoute>} />
                 <Route path="/finance" element={<ProtectedRoute allow={["owner"]}><FinancePage /></ProtectedRoute>} />
                 <Route path="/analytics" element={<ProtectedRoute allow={["owner"]}><AnalyticsPage /></ProtectedRoute>} />
                 <Route path="/ai-intelligence" element={<ProtectedRoute allow={["owner"]}><AIIntelligencePage /></ProtectedRoute>} />

@@ -15,6 +15,13 @@ class TokenResponse(BaseModel):
     name: str
 
 
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: str
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=6, max_length=128)

@@ -82,6 +82,28 @@ def apply_startup_migrations() -> None:
             # Ensure barcode index exists for fast scanner lookups
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_barcode_scan ON products(barcode_number)"))
             
+            # Product dialog fields: model, curtain, purchase tracking
+            if "model" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN model VARCHAR(120)"))
+            if "is_curtain" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN is_curtain INTEGER DEFAULT 0"))
+            if "number_of_curtains" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN number_of_curtains INTEGER"))
+            if "pieces_per_curtain" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN pieces_per_curtain INTEGER"))
+            if "per_piece_price" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN per_piece_price FLOAT"))
+            if "last_purchase_payment_type" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN last_purchase_payment_type VARCHAR(10)"))
+            if "last_purchase_remaining" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN last_purchase_remaining FLOAT DEFAULT 0.0"))
+            if "variant" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN variant VARCHAR(120)"))
+            if "color" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN color VARCHAR(80)"))
+            if "company_price" not in product_columns:
+                conn.execute(text("ALTER TABLE products ADD COLUMN company_price FLOAT"))
+
             # Add more migrations here as needed
             # Example for sales table
             # sales_columns = [row[1] for row in conn.execute(text("PRAGMA table_info(sales)")).fetchall()]
@@ -98,6 +120,9 @@ def apply_startup_migrations() -> None:
             
             # Purchase Module: ensure tables exist
             _apply_purchase_migrations(conn)
+            
+            # Expense Module v2: multi-item expenses
+            _apply_expense_migrations(conn)
             
             # Migrate default user emails from @inventory.local → @eyerflow.com
             _migrate_default_emails(conn)
@@ -457,7 +482,41 @@ def _apply_purchase_migrations(conn):
     # POS tables
     _apply_pos_migrations(conn)
 
+    _apply_device_migrations(conn)
     logger.info("Purchase migrations applied")
+
+
+def _apply_device_migrations(conn):
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+    if "devices" not in tables:
+        conn.execute(text("""
+            CREATE TABLE devices (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(120) NOT NULL,
+                device_type VARCHAR(60) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'unknown',
+                model VARCHAR(120),
+                serial_number VARCHAR(120) UNIQUE,
+                firmware_version VARCHAR(60),
+                connection_type VARCHAR(30),
+                connection_method VARCHAR(20),
+                signal_strength INTEGER,
+                driver_status VARCHAR(30),
+                last_connected_at DATETIME,
+                last_activity_at DATETIME,
+                assigned_pos_terminal VARCHAR(120),
+                location_branch VARCHAR(120),
+                error_message TEXT,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_devices_name ON devices(name)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_devices_type ON devices(device_type)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_devices_status ON devices(status)"))
+        logger.info("Created devices table")
+    logger.info("Device migrations applied")
 
 
 def _apply_pos_migrations(conn):
@@ -554,3 +613,81 @@ def _apply_pos_migrations(conn):
         """))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_sale_return_items_return ON sale_return_items(return_id)"))
         logger.info("Created sale_return_items table")
+
+
+def _apply_expense_migrations(conn):
+    """Ensure expense v2 tables and columns exist."""
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+
+    if "expenses" in tables:
+        exp_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(expenses)")).fetchall()]
+        if "voucher_no" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN voucher_no VARCHAR(20)"))
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_expenses_voucher_no ON expenses(voucher_no) WHERE voucher_no IS NOT NULL"))
+        if "employee_name" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN employee_name VARCHAR(120)"))
+        if "remarks" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN remarks TEXT"))
+        if "payment_method" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT 'cash'"))
+        if "reimbursement_pending" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN reimbursement_pending BOOLEAN DEFAULT 0"))
+        if "total_amount" not in exp_cols:
+            conn.execute(text("ALTER TABLE expenses ADD COLUMN total_amount REAL NOT NULL DEFAULT 0"))
+
+    if "expense_items" not in tables:
+        conn.execute(text(
+            "CREATE TABLE expense_items ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE, "
+            "expense_type VARCHAR(40) NOT NULL, "
+            "description VARCHAR(255), "
+            "amount REAL NOT NULL)"
+        ))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_expense_items_expense ON expense_items(expense_id)"))
+
+    if "expense_vehicles" not in tables:
+        conn.execute(text(
+            "CREATE TABLE expense_vehicles ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE, "
+            "vehicle_name VARCHAR(120) NOT NULL, "
+            "vehicle_type VARCHAR(20) NOT NULL, "
+            "driver_name VARCHAR(120), "
+            "trip_purpose VARCHAR(255))"
+        ))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_expense_vehicles_expense ON expense_vehicles(expense_id)"))
+
+    # Seed expense type GL accounts
+    expense_accounts = [
+        "Fuel & Conveyance Expense",
+        "Vehicle Maintenance Expense",
+        "Conveyance Expense",
+        "Labour Expense",
+        "Meals & Entertainment Expense",
+        "Office Supplies Expense",
+        "Utilities Expense",
+        "Rent Expense",
+        "Salary Expense",
+        "Repair & Maintenance Expense",
+        "Miscellaneous Expense",
+        "Employee Payable Account",
+        "Petty Cash Account",
+    ]
+    for name in expense_accounts:
+        existing = conn.execute(text("SELECT id FROM accounts WHERE name = :name"), {"name": name}).fetchone()
+        if not existing:
+            conn.execute(
+                text("INSERT INTO accounts (name, type) VALUES (:name, :type)"),
+                {"name": name, "type": "expense" if "Payable" not in name else "liability" if "Payable" in name else "asset"},
+            )
+    # Petty Cash is an asset
+    existing_petty = conn.execute(text("SELECT id FROM accounts WHERE name = 'Petty Cash Account'")).fetchone()
+    if not existing_petty:
+        conn.execute(text("INSERT INTO accounts (name, type) VALUES ('Petty Cash Account', 'asset')"))
+    # Employee Payable is a liability
+    existing_emp_payable = conn.execute(text("SELECT id FROM accounts WHERE name = 'Employee Payable Account'")).fetchone()
+    if not existing_emp_payable:
+        conn.execute(text("INSERT INTO accounts (name, type) VALUES ('Employee Payable Account', 'liability')"))
+
+    logger.info("Expense migrations applied")

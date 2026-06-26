@@ -26,25 +26,25 @@
   }
 
   .dark {
-    --bg-app: #020d0d;
-    --bg-card: #0d2020;
-    --bg-elevated: #0f2828;
-    --bg-hover: #122a2a;
-    --text-primary: #c0efef;
-    --text-secondary: #5a9090;
-    --border-color: rgba(0,128,128,0.22);
+    --bg-app: #0a1a1a;
+    --bg-card: #122828;
+    --bg-elevated: #163030;
+    --bg-hover: #1a3535;
+    --text-primary: #d0f0f0;
+    --text-secondary: #70a8a8;
+    --border-color: rgba(0,128,128,0.28);
     --accent: #008080;
     --accent-hover: #009a9a;
     --accent-yellow: #F5C518;
-    --chart-grid: #0d2828;
-    --tooltip-bg: #0d2020;
-    --tooltip-border: rgba(0,128,128,0.22);
-    --scrollbar-track: #041111;
-    --scrollbar-thumb: #0d3030;
-    --scrollbar-thumb-hover: #104040;
-    --sidebar-bg: #001a1a;
-    --sidebar-text: #5a9090;
-    --sidebar-hover: rgba(0,128,128,0.12);
+    --chart-grid: #183232;
+    --tooltip-bg: #122828;
+    --tooltip-border: rgba(0,128,128,0.28);
+    --scrollbar-track: #0a1f1f;
+    --scrollbar-thumb: #1a4040;
+    --scrollbar-thumb-hover: #205050;
+    --sidebar-bg: #002a2a;
+    --sidebar-text: #70a8a8;
+    --sidebar-hover: rgba(0,128,128,0.15);
   }
 
   html, body, #root {

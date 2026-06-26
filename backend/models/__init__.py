@@ -4,6 +4,7 @@ from .app_setting import AppSetting
 from .attendance_log import AttendanceLog
 from .credit import CreditAccount, CreditItem, CreditPayment, CreditTransaction, LedgerEntry
 from .customer import Customer
+from .device import Device
 from .employee import Employee
 from .expense import Expense
 from .hr_payment import HRPayment, PaymentReversal
