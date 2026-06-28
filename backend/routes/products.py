@@ -35,6 +35,12 @@ def list_products(db: Session = Depends(get_db), _=Depends(require_roles("owner"
         return []
 
 
+@router.get("/next-reference")
+def next_product_reference(_=Depends(require_roles("owner", "staff"))):
+    from datetime import date
+    return {"reference_no": f"REF-{date.today().strftime('%Y%m%d')}-{id(_) % 10000:04d}"}
+
+
 @router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(payload: ProductCreate, db: Session = Depends(get_db), _=Depends(require_roles("owner", "staff"))):
     try:

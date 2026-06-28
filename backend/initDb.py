@@ -127,6 +127,9 @@ def apply_startup_migrations() -> None:
             # Migrate default user emails from @inventory.local → @eyerflow.com
             _migrate_default_emails(conn)
 
+            # Partner Agreements module
+            _apply_partner_agreement_migrations(conn)
+
         logger.info("Database migrations applied successfully")
     except Exception as e:
         logger.error(f"Database migration failed: {e}")
@@ -691,3 +694,29 @@ def _apply_expense_migrations(conn):
         conn.execute(text("INSERT INTO accounts (name, type) VALUES ('Employee Payable Account', 'liability')"))
 
     logger.info("Expense migrations applied")
+
+
+def _apply_partner_agreement_migrations(conn):
+    tables = [row[0] for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+    if "partner_agreements" not in tables:
+        conn.execute(text("""
+            CREATE TABLE partner_agreements (
+                id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                agreement_start_date DATE NOT NULL,
+                agreement_end_date DATE,
+                duration_value INTEGER,
+                duration_unit VARCHAR(10),
+                has_investment BOOLEAN NOT NULL DEFAULT 0,
+                investment_amount FLOAT,
+                profit_share_percent FLOAT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'active',
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_partner_agreements_user ON partner_agreements(user_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_partner_agreements_status ON partner_agreements(status)"))
+        logger.info("Created partner_agreements table")
+    logger.info("Partner agreement migrations applied")

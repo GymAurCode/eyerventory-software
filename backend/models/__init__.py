@@ -11,6 +11,7 @@ from .hr_payment import HRPayment, PaymentReversal
 from .journal import JournalEntry, JournalItem
 from .leave import Leave
 from .owner_share import OwnerShare
+from .partner_agreement import PartnerAgreement
 from .payment import Payment
 from .payroll import Payroll
 from .pos_sale import PosSale, PosSaleItem, SaleReturn, SaleReturnItem
@@ -21,3 +22,32 @@ from .sale import Sale
 from .supplier import Supplier
 from .supplier_product_price import SupplierProductPrice
 from .user import User
+
+# Warehouse Module – Rebuild models (primary)
+from .warehouse_rebuild import (
+    Area,
+    COASetting,
+    Invoice,
+    InvoiceItem,
+    OpeningStock,
+    Return as WhReturn,
+    SalesmanWarehouse,
+    Shop,
+    ShopPayment,
+    StockLedger,
+    StockMovement,
+    Warehouse,
+    WarehouseCOAAccount,
+    WarehouseJournalEntry,
+    WarehouseJournalLine,
+    WarehouseStock,
+)
+# Legacy warehouse models (backward compat)
+from .warehouse import (
+    ClosingStock,
+    CycleCount,
+    CycleCountItem,
+    DamageInventory,
+    StockTransaction,
+    StockTransactionItem,
+)

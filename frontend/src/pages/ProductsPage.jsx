@@ -145,6 +145,393 @@ function ImportNudgeTooltip({ onDismiss }) {
   );
 }
 
+// ── Enterprise Product Detail Dashboard ────────────────────────────────────────
+
+function ProductDetailDashboard({ product, barcodeImgUrl, onClose, onEdit, onDelete, onAddStock, onBarcodeRegen, onBarcodeDownload, onPrintLabel }) {
+  const [activeSection, setActiveSection] = useState("overview");
+  const [favorited, setFavorited] = useState(false);
+  const [timeline, setTimeline] = useState([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+
+  const stockVal = (Number(product.stock) || 0) * (Number(product.cost_price) || 0);
+  const sellVal = (Number(product.stock) || 0) * (Number(product.selling_price) || 0);
+  const margin = Number(product.cost_price) ? ((Number(product.selling_price) - Number(product.cost_price)) / Number(product.cost_price)) * 100 : 0;
+  const profitPerUnit = (Number(product.selling_price) || 0) - (Number(product.cost_price) || 0);
+  const potentialProfit = (Number(product.stock) || 0) * profitPerUnit;
+  const stockMeta = getStockMeta(Number(product.stock || 0));
+
+  useEffect(() => {
+    if (!product?.id) return;
+    setTimelineLoading(true);
+    const entries = [
+      { type: "created", label: "Product Created", desc: "Product was added to the system", icon: "ti-circle-plus", color: "#6366f1" },
+    ];
+    if (product.updated_at) {
+      entries.push({ type: "updated", label: "Last Updated", desc: `Updated ${new Date(product.updated_at).toLocaleString()}`, icon: "ti-refresh", color: "#f59e0b" });
+    }
+    if (product.stock > 0) {
+      entries.push({ type: "stock", label: "Stock Available", desc: `${product.stock} units in inventory`, icon: "ti-package", color: "#22c55e" });
+    }
+    setTimeline(entries);
+    setTimelineLoading(false);
+  }, [product?.id]);
+
+  const statusColor = Number(product.stock) === 0 ? "#ef4444" : Number(product.stock) <= 10 ? "#f59e0b" : "#22c55e";
+  const statusLabel = Number(product.stock) === 0 ? "Out of Stock" : Number(product.stock) <= 10 ? "Low Stock" : "In Stock";
+
+  const sections = [
+    { id: "overview", label: "Overview", icon: "ti-dashboard" },
+    { id: "details", label: "Details", icon: "ti-info-circle" },
+    { id: "financial", label: "Financial", icon: "ti-currency-dollar" },
+    { id: "barcode", label: "Barcode", icon: "ti-barcode" },
+    { id: "timeline", label: "Timeline", icon: "ti-timeline" },
+  ];
+
+  const SectionNav = () => (
+    <div className="flex gap-1 overflow-x-auto pb-1 mb-4 sticky -top-0 z-10" style={{ background: "var(--bg-card)" }}>
+      {sections.map((s) => (
+        <button key={s.id} onClick={() => setActiveSection(s.id)}
+          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+          style={{
+            background: activeSection === s.id ? "var(--accent)" : "var(--bg-elevated)",
+            color: activeSection === s.id ? "#fff" : "var(--text-secondary)",
+            border: "0.5px solid var(--border-color)",
+          }}>
+          <i className={`ti ${s.icon}`} style={{ fontSize: "14px" }} />
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const StatCardSm = ({ icon, label, value, trend, color }) => (
+    <div className="relative overflow-hidden rounded-xl p-3" style={{
+      background: "color-mix(in srgb, var(--bg-elevated) 95%, transparent)",
+      border: "0.5px solid var(--border-color)",
+      backdropFilter: "blur(8px)",
+    }}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>{label}</p>
+          <p className="text-lg font-bold mt-0.5" style={{ color: color || "var(--text-primary)" }}>{value}</p>
+        </div>
+        <div className="rounded-lg p-2" style={{ background: `color-mix(in srgb, ${color || "#6366f1"} 15%, transparent)` }}>
+          <i className={`ti ${icon}`} style={{ color: color || "#6366f1", fontSize: "18px" }} />
+        </div>
+      </div>
+      {trend !== undefined && (
+        <div className="flex items-center gap-1 mt-2">
+          <span className="text-[10px] font-medium" style={{ color: trend >= 0 ? "#22c55e" : "#ef4444" }}>
+            <i className={`ti ${trend >= 0 ? "ti-trending-up" : "ti-trending-down"}`} style={{ fontSize: "10px" }} /> {Math.abs(trend)}%
+          </span>
+          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>vs avg</span>
+        </div>
+      )}
+    </div>
+  );
+
+  const GlassCard = ({ children, className = "" }) => (
+    <div className={`rounded-xl p-4 ${className}`} style={{
+      background: "color-mix(in srgb, var(--bg-elevated) 97%, transparent)",
+      border: "0.5px solid var(--border-color)",
+      backdropFilter: "blur(12px)",
+    }}>
+      {children}
+    </div>
+  );
+
+  const FieldRow = ({ label, value, col }) => (
+    <div className={col || "col-span-1"}>
+      <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: "var(--text-secondary)" }}>{label}</p>
+      <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{value || "—"}</p>
+    </div>
+  );
+
+  const TimelineIcon = ({ icon, color }) => (
+    <div className="rounded-full p-1.5" style={{ background: `color-mix(in srgb, ${color} 20%, transparent)` }}>
+      <i className={`ti ${icon}`} style={{ color, fontSize: "14px" }} />
+    </div>
+  );
+
+  return (
+    <div className="space-y-4 max-h-[85vh] overflow-y-auto px-1" style={{ scrollbarWidth: "thin" }}>
+      {/* ── Sticky Header ── */}
+      <div className="sticky top-0 z-20 -mx-1 px-1 pb-2" style={{ background: "var(--bg-card)" }}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            {product.image_data ? (
+              <div className="shrink-0 rounded-xl overflow-hidden" style={{ width: 64, height: 64, border: "0.5px solid var(--border-color)" }}>
+                <img src={product.image_data} alt={product.name} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="shrink-0 rounded-xl flex items-center justify-center" style={{ width: 64, height: 64, background: "var(--bg-elevated)", border: "0.5px solid var(--border-color)" }}>
+                <i className="ti ti-box" style={{ color: "var(--text-secondary)", fontSize: "24px" }} />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold truncate" style={{ color: "var(--text-primary)" }}>{product.name}</h2>
+                <span className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                  style={{ background: `color-mix(in srgb, ${statusColor} 18%, transparent)`, color: statusColor }}>
+                  {statusLabel}
+                </span>
+                <button onClick={() => setFavorited(!favorited)} className="text-sm" style={{ color: favorited ? "#f59e0b" : "var(--text-secondary)" }}>
+                  <i className={`ti ${favorited ? "ti-star-filled" : "ti-star"}`} />
+                </button>
+              </div>
+              <div className="flex items-center gap-3 mt-0.5 text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span><i className="ti ti-hash mr-1" />{product.id}</span>
+                {product.sku && <span><i className="ti ti-tag mr-1" />{product.sku}</span>}
+                {product.category && <span><i className="ti ti-folder mr-1" />{product.category}</span>}
+                {product.created_at && <span><i className="ti ti-calendar mr-1" />Created {new Date(product.created_at).toLocaleDateString()}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={onEdit} className="btn-soft px-2.5 py-1.5 text-xs flex items-center gap-1" title="Edit"><i className="ti ti-pencil" /> Edit</button>
+            <button onClick={onDelete} className="btn-soft px-2.5 py-1.5 text-xs flex items-center gap-1" style={{ color: "#ef4444" }} title="Delete"><i className="ti ti-trash" /> Delete</button>
+            <button onClick={onPrintLabel} className="btn-soft px-2.5 py-1.5 text-xs" title="Print Label"><i className="ti ti-printer" /></button>
+            <button onClick={onBarcodeDownload} className="btn-soft px-2.5 py-1.5 text-xs" title="Download Barcode"><i className="ti ti-download" /></button>
+            <button onClick={onClose} className="btn-soft px-2.5 py-1.5 text-xs" title="Close"><i className="ti ti-x" /></button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section Navigation ── */}
+      <SectionNav />
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION: Overview
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeSection === "overview" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+            <StatCardSm icon="ti-package" label="Current Stock" value={product.stock} color="#6366f1" />
+            <StatCardSm icon="ti-currency-dollar" label="Stock Value (Cost)" value={formatPKR(stockVal)} color="#22c55e" />
+            <StatCardSm icon="ti-currency-dollar" label="Stock Value (Sell)" value={formatPKR(sellVal)} color="#06b6d4" />
+            <StatCardSm icon="ti-percentage" label="Profit Margin" value={`${margin.toFixed(1)}%`} trend={margin} color="#f59e0b" />
+            <StatCardSm icon="ti-coins" label="Potential Profit" value={formatPKR(potentialProfit)} color="#ec4899" />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <GlassCard>
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Product Information</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <FieldRow label="Name" value={product.name} />
+                <FieldRow label="SKU" value={product.sku || "—"} />
+                <FieldRow label="Category" value={product.category || "—"} />
+                <FieldRow label="Stock" value={product.stock} />
+                <FieldRow label="Cost Price" value={formatPKR(product.cost_price)} />
+                <FieldRow label="Selling Price" value={formatPKR(product.selling_price)} />
+                {product.created_at && <FieldRow label="Created" value={new Date(product.created_at).toLocaleDateString()} />}
+                {product.updated_at && <FieldRow label="Updated" value={new Date(product.updated_at).toLocaleDateString()} />}
+              </div>
+            </GlassCard>
+
+            <GlassCard>
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Financial Summary</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between py-2" style={{ borderBottom: "0.5px solid var(--border-color)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Cost Price (Unit)</span>
+                  <span className="text-sm font-semibold">{formatPKR(product.cost_price)}</span>
+                </div>
+                <div className="flex justify-between py-2" style={{ borderBottom: "0.5px solid var(--border-color)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Selling Price (Unit)</span>
+                  <span className="text-sm font-semibold">{formatPKR(product.selling_price)}</span>
+                </div>
+                <div className="flex justify-between py-2" style={{ borderBottom: "0.5px solid var(--border-color)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Profit Per Unit</span>
+                  <span className="text-sm font-semibold" style={{ color: profitPerUnit >= 0 ? "#22c55e" : "#ef4444" }}>{formatPKR(profitPerUnit)}</span>
+                </div>
+                <div className="flex justify-between py-2" style={{ borderBottom: "0.5px solid var(--border-color)" }}>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Margin</span>
+                  <span className="text-sm font-semibold" style={{ color: margin >= 0 ? "#22c55e" : "#ef4444" }}>{margin.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Inventory Value (Cost)</span>
+                  <span className="text-sm font-bold">{formatPKR(stockVal)}</span>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION: Details
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeSection === "details" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <GlassCard>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>General Information</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <FieldRow label="Product ID" value={`#${product.id}`} />
+              <FieldRow label="Name" value={product.name} />
+              <FieldRow label="SKU" value={product.sku || "—"} />
+              <FieldRow label="Category" value={product.category || "—"} />
+              <FieldRow label="Barcode" value={product.barcode_number || "—"} />
+              <FieldRow label="Description" value={product.description || "—"} col="col-span-2" />
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Inventory Details</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              <FieldRow label="Current Stock" value={product.stock} />
+              <FieldRow label="Stock Status" value={stockMeta.label || "Normal"} />
+              <FieldRow label="Cost Price" value={formatPKR(product.cost_price)} />
+              <FieldRow label="Selling Price" value={formatPKR(product.selling_price)} />
+              <FieldRow label="Stock Value" value={formatPKR(stockVal)} />
+              <FieldRow label="Total Value (Sell)" value={formatPKR(sellVal)} />
+            </div>
+          </GlassCard>
+          {product.image_data && (
+            <GlassCard className="lg:col-span-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Product Image</h3>
+              <div className="flex justify-center">
+                <img src={product.image_data} alt={product.name} className="max-h-64 rounded-lg object-contain" style={{ maxWidth: "400px" }} />
+              </div>
+            </GlassCard>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION: Financial
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeSection === "financial" && (
+        <div className="space-y-4">
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+            <StatCardSm icon="ti-currency-dollar" label="Cost Price" value={formatPKR(product.cost_price)} color="#6366f1" />
+            <StatCardSm icon="ti-currency-dollar" label="Selling Price" value={formatPKR(product.selling_price)} color="#22c55e" />
+            <StatCardSm icon="ti-coins" label="Profit / Unit" value={formatPKR(profitPerUnit)} color={profitPerUnit >= 0 ? "#22c55e" : "#ef4444"} />
+            <StatCardSm icon="ti-percentage" label="Margin" value={`${margin.toFixed(1)}%`} color="#f59e0b" />
+          </div>
+          <GlassCard>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>P&L Breakdown</h3>
+            <div className="space-y-3">
+              {[
+                { label: "Revenue if Sold", value: sellVal, color: "#22c55e" },
+                { label: "Cost of Goods", value: stockVal, color: "#ef4444" },
+                { label: "Gross Profit Potential", value: potentialProfit, color: potentialProfit >= 0 ? "#22c55e" : "#ef4444" },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-lg px-4 py-3" style={{ background: "var(--bg-elevated)" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: item.color }} />
+                    <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{item.label}</span>
+                  </div>
+                  <span className="text-sm font-bold" style={{ color: item.color }}>{formatPKR(item.value)}</span>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Pricing History</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg p-3 text-center" style={{ background: "var(--bg-elevated)" }}>
+                <p className="text-[10px] font-medium uppercase" style={{ color: "var(--text-secondary)" }}>Cost Price</p>
+                <p className="text-xl font-bold mt-1" style={{ color: "#6366f1" }}>{formatPKR(product.cost_price)}</p>
+              </div>
+              <div className="rounded-lg p-3 text-center" style={{ background: "var(--bg-elevated)" }}>
+                <p className="text-[10px] font-medium uppercase" style={{ color: "var(--text-secondary)" }}>Selling Price</p>
+                <p className="text-xl font-bold mt-1" style={{ color: "#22c55e" }}>{formatPKR(product.selling_price)}</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION: Barcode
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeSection === "barcode" && (
+        <GlassCard>
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--text-secondary)" }}>Barcode Management</h3>
+          <div className="flex flex-col items-center gap-4">
+            {product.barcode_number ? (
+              <>
+                <div className="rounded-xl p-6" style={{ background: "white", border: "0.5px solid var(--border-color)" }}>
+                  {barcodeImgUrl ? (
+                    <img src={barcodeImgUrl} alt="Barcode" style={{ width: "280px", height: "auto" }} />
+                  ) : (
+                    <div className="flex items-center justify-center" style={{ width: 280, height: 80 }}>
+                      <p className="text-xs" style={{ color: "var(--text-secondary)" }}>Loading barcode...</p>
+                    </div>
+                  )}
+                  <p className="font-mono text-sm text-center mt-2" style={{ color: "#1a1a2e" }}>{product.barcode_number}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <button onClick={onPrintLabel} className="btn-soft text-xs px-4 py-2 flex items-center gap-1.5 rounded-lg"><i className="ti ti-printer" /> Print Label</button>
+                  <button onClick={onBarcodeDownload} className="btn-soft text-xs px-4 py-2 flex items-center gap-1.5 rounded-lg"><i className="ti ti-download" /> Download PNG</button>
+                  <button onClick={onBarcodeRegen} className="btn-soft text-xs px-4 py-2 flex items-center gap-1.5 rounded-lg"><i className="ti ti-refresh" /> Regenerate</button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <i className="ti ti-barcode-off" style={{ fontSize: "48px", color: "var(--text-secondary)" }} />
+                <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>No barcode generated for this product</p>
+                <button onClick={onBarcodeRegen} className="btn-primary text-sm px-4 py-2 mt-3 rounded-lg flex items-center gap-1.5 mx-auto"><i className="ti ti-barcode" /> Generate Barcode</button>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SECTION: Timeline
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeSection === "timeline" && (
+        <GlassCard>
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--text-secondary)" }}>Activity Timeline</h3>
+          {timelineLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg animate-pulse" style={{ background: "var(--bg-elevated)" }} />)}
+            </div>
+          ) : timeline.length === 0 ? (
+            <div className="text-center py-8">
+              <i className="ti ti-timeline" style={{ fontSize: "32px", color: "var(--text-secondary)" }} />
+              <p className="mt-2 text-sm" style={{ color: "var(--text-secondary)" }}>No activity recorded yet</p>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-4 top-0 bottom-0 w-px" style={{ background: "var(--border-color)" }} />
+              <div className="space-y-4">
+                {timeline.map((entry, i) => (
+                  <div key={i} className="relative flex items-start gap-4 pl-2">
+                    <div className="relative z-10">
+                      <TimelineIcon icon={entry.icon} color={entry.color} />
+                    </div>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{entry.label}</p>
+                        <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: `color-mix(in srgb, ${entry.color} 15%, transparent)`, color: entry.color }}>
+                          {entry.type}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>{entry.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* ── Bottom Quick Actions ── */}
+      <GlassCard>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-secondary)" }}>Quick Actions</h3>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={onAddStock} className="btn-primary text-xs px-4 py-2 rounded-lg flex items-center gap-1.5"><i className="ti ti-package-plus" /> Add Stock</button>
+          <button onClick={onEdit} className="btn-soft text-xs px-4 py-2 rounded-lg flex items-center gap-1.5"><i className="ti ti-pencil" /> Edit Product</button>
+          <button onClick={onPrintLabel} className="btn-soft text-xs px-4 py-2 rounded-lg flex items-center gap-1.5"><i className="ti ti-printer" /> Print Label</button>
+          <button onClick={onBarcodeDownload} className="btn-soft text-xs px-4 py-2 rounded-lg flex items-center gap-1.5"><i className="ti ti-download" /> Download Barcode</button>
+          <button onClick={onDelete} className="btn-soft text-xs px-4 py-2 rounded-lg flex items-center gap-1.5" style={{ color: "#ef4444" }}><i className="ti ti-trash" /> Delete</button>
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const { role } = useAuth();
   const navigate = useNavigate();
@@ -562,105 +949,35 @@ export default function ProductsPage() {
         </form>
       </Modal>
 
-      <Modal title={`Product Details — ${selected?.name || ""}`} open={viewOpen} onClose={() => setViewOpen(false)}>
+      <Modal title="" open={viewOpen} onClose={() => setViewOpen(false)} maxWidth="max-w-6xl" hideTitle>
         {selected && (
-          <div className="space-y-3 text-sm">
-            <div className="space-y-1">
-              <p><strong>Name:</strong> {selected.name}</p>
-              <p><strong>Category:</strong> {selected.category || "—"}</p>
-              <p><strong>SKU:</strong> {selected.sku || "—"}</p>
-              <p><strong>Stock:</strong> {selected.stock}</p>
-              <p><strong>Cost Price:</strong> {formatPKR(selected.cost_price)}</p>
-              <p><strong>Selling Price:</strong> {formatPKR(selected.selling_price)}</p>
-            </div>
-            {selected.image_data && <img src={selected.image_data} alt={selected.name} className="mt-2 max-h-48 w-full rounded-lg object-contain" />}
-
-            {/* Barcode Section */}
-            <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "var(--border-color)" }}>
-              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Barcode</p>
-              <div className="flex flex-col items-center">
-                {selected.barcode_number ? (
-                  <>
-                    {barcodeImgUrl ? (
-                      <img src={barcodeImgUrl} alt="Barcode" style={{ width: "200px", height: "auto" }} />
-                    ) : (
-                      <p className="font-mono text-xs text-center" style={{ color: "var(--text-secondary)" }}>
-                        No barcode generated
-                      </p>
-                    )}
-                    <p className="font-mono text-sm text-center mt-1">{selected.barcode_number}</p>
-                  </>
-                ) : (
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>No barcode generated</p>
-                )}
-              </div>
-              <div className="flex gap-2 justify-center mt-2">
-                {selected.barcode_number ? (
-                  <>
-                    <button
-                      className="btn-soft text-xs px-3 py-1"
-                      onClick={() => printSingleBarcode(selected.id, selected.name, selected.selling_price, selected.barcode_number)}
-                    >
-                      <i className="ti ti-printer mr-1" /> Print Label
-                    </button>
-                    <button
-                      className="btn-soft text-xs px-3 py-1"
-                      onClick={async () => {
-                        try {
-                          const blob = await posApi.getBarcodeImage(selected.id);
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `barcode_${selected.id}.png`;
-                          link.click();
-                          URL.revokeObjectURL(url);
-                        } catch {
-                          toast.error("Failed to download barcode");
-                        }
-                      }}
-                    >
-                      <i className="ti ti-download mr-1" /> Download PNG
-                    </button>
-                    <button
-                      className="btn-soft text-xs px-3 py-1"
-                      onClick={async () => {
-                        try {
-                          await posApi.generateBarcode(selected.id);
-                          toast.success("Barcode regenerated");
-                          await load();
-                          const all = (await api.get("/products")).data;
-                          const found = all.find((p) => p.id === selected.id);
-                          if (found) setSelected(found);
-                        } catch {
-                          toast.error("Failed to regenerate barcode");
-                        }
-                      }}
-                    >
-                      <i className="ti ti-refresh mr-1" /> Regenerate
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="btn-primary text-xs px-3 py-1"
-                    onClick={async () => {
-                        try {
-                          await posApi.generateBarcode(selected.id);
-                          toast.success("Barcode generated");
-                          await load();
-                          const all = (await api.get("/products")).data;
-                          const found = all.find((p) => p.id === selected.id);
-                          if (found) setSelected(found);
-                        } catch {
-                          toast.error("Failed to generate barcode");
-                        }
-                      }}
-                  >
-                    <i className="ti ti-barcode mr-1" /> Generate Barcode
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <ProductDetailDashboard
+            product={selected}
+            barcodeImgUrl={barcodeImgUrl}
+            onClose={() => setViewOpen(false)}
+            onEdit={() => { setViewOpen(false); openEdit(selected); }}
+            onDelete={() => { setViewOpen(false); setDeleting(selected); }}
+            onAddStock={() => { setViewOpen(false); openAddStock(selected); }}
+            onBarcodeRegen={async () => {
+              try {
+                await posApi.generateBarcode(selected.id);
+                toast.success("Barcode regenerated");
+                await load();
+                const all = (await api.get("/products")).data;
+                const found = all.find((p) => p.id === selected.id);
+                if (found) setSelected(found);
+              } catch { toast.error("Failed to regenerate barcode"); }
+            }}
+            onBarcodeDownload={async () => {
+              try {
+                const blob = await posApi.getBarcodeImage(selected.id);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url; a.download = `barcode_${selected.id}.png`; a.click();
+                URL.revokeObjectURL(url);
+              } catch { toast.error("Failed to download barcode"); }
+            }}
+            onPrintLabel={() => printSingleBarcode(selected.id, selected.name, selected.selling_price, selected.barcode_number)}
+          />
         )}
       </Modal>
 

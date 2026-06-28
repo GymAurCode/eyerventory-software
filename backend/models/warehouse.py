@@ -1,66 +1,69 @@
+"""
+warehouse.py — Legacy + Rebuild models (backward-compatible shim).
+
+All new models are defined in warehouse_rebuild.py.
+This file re-exports them and keeps legacy model classes for existing code.
+"""
+
+from datetime import datetime
+
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+    CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from backend.database import Base
+from backend.models.warehouse_rebuild import (
+    Area,
+    COASetting,
+    Invoice,
+    InvoiceItem,
+    OpeningStock,
+    Return,
+    SalesmanWarehouse,
+    Shop,
+    ShopPayment,
+    StockLedger,
+    StockMovement,
+    Warehouse,
+    WarehouseCOAAccount,
+    WarehouseJournalEntry,
+    WarehouseJournalLine,
+    WarehouseStock,
+)
+
+__all__ = [
+    # Rebuild models
+    "Area",
+    "COASetting",
+    "Invoice",
+    "InvoiceItem",
+    "OpeningStock",
+    "Return",
+    "SalesmanWarehouse",
+    "Shop",
+    "ShopPayment",
+    "StockLedger",
+    "StockMovement",
+    "Warehouse",
+    "WarehouseCOAAccount",
+    "WarehouseJournalEntry",
+    "WarehouseJournalLine",
+    "WarehouseStock",
+    # Legacy models (still used by warehouse_service.py)
+    "ClosingStock",
+    "CycleCount",
+    "CycleCountItem",
+    "DamageInventory",
+    "StockTransaction",
+    "StockTransactionItem",
+]
 
 
-class Warehouse(Base):
-    __tablename__ = "warehouses"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(120), nullable=False, unique=True)
-    code = Column(String(20), nullable=True, unique=True)
-    location = Column(String(255), nullable=True)
-    is_active = Column(Integer, nullable=False, default=1)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    stock_items = relationship("WarehouseStock", back_populates="warehouse", cascade="all, delete-orphan")
-
-
-class WarehouseStock(Base):
-    __tablename__ = "warehouse_stock"
-    __table_args__ = (
-        UniqueConstraint("warehouse_id", "product_id", name="uq_warehouse_product"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False, default=0)
-    reorder_level = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    warehouse = relationship("Warehouse", back_populates="stock_items")
-    product = relationship("Product", backref="warehouse_stock")
-
-
-class StockLedger(Base):
-    __tablename__ = "stock_ledger"
-    __table_args__ = (
-        CheckConstraint("transaction_type IN ('stock_in','stock_out','transfer_in','transfer_out','adjustment','return','damage','opening','sale')"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
-    transaction_type = Column(String(20), nullable=False, index=True)
-    reference_type = Column(String(40), nullable=True)
-    reference_id = Column(Integer, nullable=True)
-    quantity = Column(Integer, nullable=False)
-    balance_before = Column(Integer, nullable=False)
-    balance_after = Column(Integer, nullable=False)
-    unit_price = Column(Float, nullable=True)
-    total_amount = Column(Float, nullable=True)
-    description = Column(String(255), nullable=True)
-    created_by = Column(String(100), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
-
-    product = relationship("Product", backref="stock_ledger_entries")
-    warehouse = relationship("Warehouse", backref="stock_ledger_entries")
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEGACY MODELS — preserved for existing service/route compatibility
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 class StockTransaction(Base):

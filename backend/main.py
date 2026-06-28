@@ -20,9 +20,9 @@ from backend.models.user import User
 from backend.models.owner_share import OwnerShare
 from backend.routes import (
     accounting, activities, ai, attendance, auth, credits, customers, devices,
-    employees, expenses, finance, hr_payments, import_export, ledger, leaves, partners, payments,
-    payroll, pos, product_add, products, purchases, reminders, reports, sales, settings,
-    suppliers, users, warehouses,
+    employees, expenses, finance, hr_payments, import_export, invoices, ledger, leaves,
+    partner_agreements, partners, payments, payroll, pos, product_add, products, purchases, reminders,
+    reports, sales, sales_breakdown, settings, shops, suppliers, users, warehouses, warehouse_reports,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -100,7 +100,9 @@ app.include_router(expenses.router,   prefix="/api")
 app.include_router(finance.router,    prefix="/api")
 app.include_router(accounting.router, prefix="/api")
 app.include_router(users.router,      prefix="/api")
-app.include_router(partners.router,   prefix="/api")
+app.include_router(partners.router,          prefix="/api")
+app.include_router(partner_agreements.router, prefix="/api")
+app.include_router(sales_breakdown.router,    prefix="/api")
 app.include_router(settings.router,   prefix="/api")
 app.include_router(reports.router,    prefix="/api")
 app.include_router(employees.router,  prefix="/api")
@@ -114,8 +116,11 @@ app.include_router(reminders.router,  prefix="/api")
 app.include_router(activities.router, prefix="/api")
 app.include_router(pos.router,        prefix="/api")
 app.include_router(devices.router,        prefix="/api")
-app.include_router(warehouses.router,    prefix="/api")
-app.include_router(import_export.router, prefix="/api")
+app.include_router(shops.router,        prefix="/api")
+app.include_router(invoices.router,     prefix="/api")
+app.include_router(warehouses.router,   prefix="/api")
+app.include_router(warehouse_reports.router,   prefix="/api")
+app.include_router(import_export.router,prefix="/api")
 
 
 @app.get("/api/health", tags=["health"])

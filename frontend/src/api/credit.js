@@ -27,7 +27,7 @@ export async function getLedger(partyId, partyType) {
 }
 
 export async function getCreditSummary() {
-  const res = await api.get("/reports/credit-summary");
+  const res = await api.get("/credits/reports/credit-summary");
   return res.data;
 }
 
